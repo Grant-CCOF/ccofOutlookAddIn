@@ -1,0 +1,2 @@
+# ccofOutlookAddIn
+Simple Outlook Addin
