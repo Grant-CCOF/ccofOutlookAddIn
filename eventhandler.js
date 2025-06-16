@@ -105,9 +105,9 @@ async function startBackgroundProcessing() {
     console.log("No follow-up tag and no reply. Calling LLM to check follow-up urgency...");
     const urgency = await needsFollowUp(msg);
     const catagories = {
-      high: "1 - AI FollowUp High",
-      normal: "2 - AI FollowUp Normal",
-      low: "3 - AI FollowUp Low",
+      High: "1 - AI FollowUp High",
+      Normal: "2 - AI FollowUp Normal",
+      Low: "3 - AI FollowUp Low",
     };
 
     if (urgency && urgency != 'No Response Required')  {
