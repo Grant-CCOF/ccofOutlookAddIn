@@ -33,6 +33,12 @@ async function startBackgroundProcessing() {
   for (let msg of messages) {
     console.log(`Processing message: ${msg.subject}`);
 
+    const hasReplied = await hasRepliedCategory(msg.id);
+    if (hasReplied) {
+      console.log("Message already has a replied category. Skipping.");
+      continue;
+    }
+    
     const isReplied = await hasBeenRepliedTo(msg.id);
     if (isReplied) {
       console.log("Message has been replied to. Removing priority category and tagging as 'replied'.");
@@ -68,6 +74,12 @@ async function startBackgroundProcessing() {
   for (let msg of sentMessages) {
     console.log(`\nEvaluating follow-up need for sent message: ${msg.subject}`);
 
+    const hasReplied = await hasRepliedCategory(msg.id);
+    if (hasReplied) {
+      console.log("Message already has a replied category. Skipping.");
+      continue;
+    }
+    
     const isReplied = await hasBeenRepliedTo(msg.id);
     if (isReplied) {
       console.log("This sent message has already been replied to. Setting as replied.");
@@ -154,6 +166,13 @@ async function hasPriorityCategory(msg) {
     c.toLowerCase().includes("ai.priority") || c.toLowerCase().includes("ai priority")
   );
   console.log(`hasPriorityCategory(${msg.id}): ${hasCategory}`);
+  return hasCategory;
+}
+
+async function hasRepliedCategory(msg) {
+  console.log(`Message Categories: ${msg.categories}`)
+  const hasCategory = msg.categories?.some(c => c.toLowerCase().includes("replied"));
+  console.log(`hasRepliedCategory(${msg.id}): ${hasCategory}`);
   return hasCategory;
 }
 
