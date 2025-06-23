@@ -219,7 +219,7 @@ async function needsFollowUp(msg) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      prompt: prompt.trim()
+      prompt: prompt
     })
   });
 
