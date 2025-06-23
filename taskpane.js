@@ -46,10 +46,24 @@ async function generateReplySuggestion() {
 
       console.log("Sending prompt to local LLM...");
 
+      /* Local Fetch
       const response = await fetch("http://localhost:11434/api/generate", {
         method: "POST",
         body: JSON.stringify({ model: "llama3.1:8b", prompt }),
         headers: { "Content-Type": "application/json" }
+      });
+      */
+
+      const token = await getAccessToken();
+      const response = await fetch("https://ccofficefurniture.com/wp-json/openai-proxy/v1/generate", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`, // Microsoft Graph access token
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prompt: prompt
+        })
       });
 
       const text = await response.text();
@@ -93,4 +107,44 @@ function getItemSubject(item) {
       }
     });
   });
+}
+
+async function getAccessToken() {
+  const msalConfig = {
+    auth: {
+      clientId: "63e4f7da-45fc-45fa-9300-72b3038e72ef",
+      authority: "https://login.microsoftonline.com/common",
+      redirectUri: "https://outlook.office.com/"
+    },
+    cache: {
+      cacheLocation: "localStorage",
+      storeAuthStateInCookie: false
+    }
+  };
+  const loginRequest = {
+    scopes: ["Mail.ReadWrite", "Mail.Send", "User.Read"]
+  };
+  console.log("Getting access token...");
+  const msalInstance = new msal.PublicClientApplication(msalConfig);
+  const accounts = msalInstance.getAllAccounts();
+  console.log(`Found ${accounts.length} accounts.`);
+
+  if (accounts.length === 0) {
+    console.log("Triggering login popup...");
+    await msalInstance.loginPopup(loginRequest);
+  }
+
+  const activeAccount = msalInstance.getAllAccounts()[0];
+  if (!activeAccount) {
+    console.error("No active account found after login.");
+    throw new Error("No active account found after login.");
+  }
+
+  const result = await msalInstance.acquireTokenSilent({
+    ...loginRequest,
+    account: activeAccount
+  });
+
+  console.log("Access token acquired.");
+  return result.accessToken;
 }
