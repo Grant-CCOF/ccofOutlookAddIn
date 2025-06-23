@@ -199,6 +199,7 @@ async function needsFollowUp(msg) {
     ${body}
   `;
 
+  /* Local Fetch
   const res = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
     body: JSON.stringify({
@@ -207,6 +208,19 @@ async function needsFollowUp(msg) {
       stream: false
     }),
     headers: { "Content-Type": "application/json" }
+  });
+  */
+
+  const token = await getAccessToken();
+  const res = await fetch("https://ccofficefurniture.com/wp-json/openai-proxy/v1/generate", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`, // Microsoft Graph access token
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt: prompt.trim()
+    })
   });
 
   const text = await res.text();
@@ -306,6 +320,7 @@ async function getPriorityFromLLM(msg) {
     ${strippedBody}
   `;
 
+  /* Local Fetch
   const res = await fetch("http://localhost:11434/api/generate", {
     method: "POST",
     body: JSON.stringify({
@@ -315,6 +330,19 @@ async function getPriorityFromLLM(msg) {
     headers: {
       "Content-Type": "application/json"
     }
+  });
+  */
+
+  const token = await getAccessToken();
+  const res = await fetch("https://ccofficefurniture.com/wp-json/openai-proxy/v1/generate", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`, // Microsoft Graph access token
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt: prompt.trim()
+    })
   });
 
   const text = await res.text();
