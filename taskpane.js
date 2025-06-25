@@ -131,8 +131,6 @@ async function getAccessToken() {
   const accounts = msalInstance.getAllAccounts();
   console.log(`Found ${accounts.length} accounts.`);
 
-  await msalInstance.loginPopup(loginRequest);
-
   if (accounts.length === 0) {
     console.log("Triggering login popup...");
     await msalInstance.loginPopup(loginRequest);
