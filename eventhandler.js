@@ -337,7 +337,7 @@ async function getPriorityFromLLM(msg) {
   });
   */
 
-  const token = await getAccessToken();
+  const token = await getBackEndAccessToken();
   const res = await fetch("https://ccofficefurniture.com/wp-json/openai-proxy/v1/generate", {
     method: "POST",
     headers: {
@@ -536,5 +536,47 @@ async function getAccessToken() {
 
   console.log("Access token acquired.");
   console.log("Token: " + result.accessToken);
+  return result.accessToken;
+}
+
+async function getBackEndAccessToken() {
+  const msalConfig = {
+    auth: {
+      clientId: "63e4f7da-45fc-45fa-9300-72b3038e72ef",
+      authority: "https://login.microsoftonline.com/common",
+      redirectUri: "https://outlook.office.com/"
+    },
+    cache: {
+      cacheLocation: "localStorage",
+      storeAuthStateInCookie: false
+    }
+  };
+  const loginRequest = {
+    scopes: [
+      "api://2f0ea062-93bd-4937-bcc1-5c87af3d6026/access_as_a_user"
+    ]
+  };
+  console.log("Getting access token...");
+  const msalInstance = new msal.PublicClientApplication(msalConfig);
+  const accounts = msalInstance.getAllAccounts();
+  console.log(`Found ${accounts.length} accounts.`);
+
+  if (accounts.length === 0) {
+    console.log("Triggering login popup...");
+    await msalInstance.loginPopup(loginRequest);
+  }
+
+  const activeAccount = msalInstance.getAllAccounts()[0];
+  if (!activeAccount) {
+    console.error("No active account found after login.");
+    throw new Error("No active account found after login.");
+  }
+
+  const result = await msalInstance.acquireTokenSilent({
+    ...loginRequest,
+    account: activeAccount
+  });
+
+  console.log("Access token acquired.");
   return result.accessToken;
 }
