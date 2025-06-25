@@ -20,8 +20,12 @@ const msalConfig = {
   }
 };
 const loginRequest = {
-  scopes: ["Mail.ReadWrite", "Mail.Send", "User.Read"]
-};
+    scopes: [
+      "https://graph.microsoft.com/Mail.ReadWrite",
+      "https://graph.microsoft.com/Mail.Send",
+      "https://graph.microsoft.com/User.Read"
+    ]
+  };
 
 async function startBackgroundProcessing() {
   console.log("Starting background processing...");
