@@ -229,19 +229,8 @@ async function needsFollowUp(msg) {
 
   const text = await res.text();
 
-  let fullResponse = "";
-  const lines = text.trim().split("\n");
-
-  for (const line of lines) {
-    try {
-      const obj = JSON.parse(line);
-      if (typeof obj.response === "string") {
-        fullResponse += obj.response;
-      }
-    } catch (e) {
-      console.error("Failed to parse line:", line, e);
-    }
-  }
+  const obj = JSON.parse(text);
+  const fullResponse = obj.choices?.[0]?.message?.content;
 
   console.log(`LLM reconstructed response: ${fullResponse}`);
 
@@ -351,16 +340,9 @@ async function getPriorityFromLLM(msg) {
 
   const text = await res.text();
 
-  const lines = text.trim().split('\n');
-  let data = "";
-  for (const line of lines) {
-    try {
-      const obj = JSON.parse(line);
-      data += obj.response || "";
-    } catch (e) {
-      console.error("Failed to parse line:", line, e);
-    }
-  }
+  const obj = JSON.parse(text);
+  const data = obj.choices?.[0]?.message?.content;
+  
   console.log(`LLM priority score response: ${data}`);
 
   if (["1", "2", "3", "4", "5"].includes(data)) {
