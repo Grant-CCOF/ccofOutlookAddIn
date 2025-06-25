@@ -531,5 +531,6 @@ async function getAccessToken() {
   });
 
   console.log("Access token acquired.");
+  console.log("Token: " + result.accessToken);
   return result.accessToken;
 }
