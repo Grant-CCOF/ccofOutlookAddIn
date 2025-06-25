@@ -123,9 +123,7 @@ async function getAccessToken() {
   };
   const loginRequest = {
     scopes: [
-      "https://graph.microsoft.com/Mail.ReadWrite",
-      "https://graph.microsoft.com/Mail.Send",
-      "https://graph.microsoft.com/User.Read"
+      "api://2f0ea062-93bd-4937-bcc1-5c87af3d6026/access_as_a_user"
     ]
   };
   console.log("Getting access token...");
