@@ -122,7 +122,11 @@ async function getAccessToken() {
     }
   };
   const loginRequest = {
-    scopes: ["Mail.ReadWrite", "Mail.Send", "User.Read"]
+    scopes: [
+      "https://graph.microsoft.com/Mail.ReadWrite",
+      "https://graph.microsoft.com/Mail.Send",
+      "https://graph.microsoft.com/User.Read"
+    ]
   };
   console.log("Getting access token...");
   const msalInstance = new msal.PublicClientApplication(msalConfig);
