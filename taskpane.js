@@ -112,7 +112,7 @@ function getItemSubject(item) {
 async function getAccessToken() {
   const msalConfig = {
     auth: {
-      clientId: "2f0ea062-93bd-4937-bcc1-5c87af3d6026",
+      clientId: "63e4f7da-45fc-45fa-9300-72b3038e72ef",
       authority: "https://login.microsoftonline.com/common",
       redirectUri: "https://grant-ccof.github.io/ccofOutlookAddIn/redirect.html"
     },
