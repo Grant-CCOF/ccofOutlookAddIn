@@ -69,19 +69,9 @@ async function generateReplySuggestion() {
       const text = await response.text();
       console.log("Raw NDJSON:", text);
 
-      // Split the NDJSON by lines
-      const lines = text.trim().split('\n');
-
-      // Parse each line and combine responses
-      let fullResponse = "";
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line);
-          fullResponse += obj.response || "";
-        } catch (e) {
-          console.error("Failed to parse line:", line, e);
-        }
-      }
+      const obj = JSON.parse(text);
+      const fullResponse = obj.choices?.[0]?.message?.content;
+      console.log("Full Response:", fullResponse);
 
       if (fullResponse != "") {
         console.log("AI response received.");
