@@ -230,10 +230,10 @@ async function needsFollowUp(msg) {
   });
 
   const text = await res.text();
-  console.log(`Response: $(res)`);
-  console.log(`Text: $(text)`);
+  console.log(`Response: ${res}`);
+  console.log(`Text: ${text}`);
   const obj = JSON.parse(text);
-  console.log(`Obj: $(obj)`);
+  console.log(`Obj: ${obj}`);
   const fullResponse = obj.choices?.[0]?.message?.content;
 
   console.log(`LLM reconstructed response: ${fullResponse}`);
@@ -246,13 +246,15 @@ async function needsFollowUp(msg) {
     return null;
   } catch (e) {
     console.warn("Failed to parse full response as JSON. Attempting fallback.");
-
-    const lower = fullResponse?.toLowerCase();
-    if (lower.includes("true")) {
-      if (lower.includes("high")) return "High";
-      if (lower.includes("normal")) return "Normal";
-      if (lower.includes("low")) return "Low";
-      return "Normal";
+    if (fullResponse) {
+      const lower = fullResponse?.toLowerCase();
+      if (lower.includes("true")) {
+        if (lower.includes("high")) return "High";
+        if (lower.includes("normal")) return "Normal";
+        if (lower.includes("low")) return "Low";
+        return "Normal";
+      }
+      return "No Response Required";
     }
     return "No Response Required";
   }
