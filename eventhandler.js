@@ -151,6 +151,8 @@ async function startBackgroundProcessing() {
   }
 
   console.log("Background processing complete.");
+  const suggestionElement = document.getElementById("suggestion");
+  suggestionElement.textContent = "Processing complete!";
 }
 
 function getFollowUpCategory(categories) {
