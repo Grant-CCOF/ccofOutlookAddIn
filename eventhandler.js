@@ -215,7 +215,7 @@ async function needsFollowUp(msg) {
   });
   */
 
-  const token = await getAccessToken();
+  const token = await getBackEndAccessToken();
   const res = await fetch("https://ccofficefurniture.com/wp-json/openai-proxy/v1/generate", {
     method: "POST",
     headers: {
