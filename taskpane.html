@@ -6,21 +6,58 @@
   <style>
     body {
       font-family: sans-serif;
+      padding: 10px;
       transition: background-color 0.3s, color 0.3s;
     }
+
     .light-theme {
       background-color: white;
       color: black;
     }
+
     .dark-theme {
       background-color: #1e1e1e;
       color: white;
     }
+
+    textarea {
+      width: 100%;
+      height: 150px;
+      margin-top: 10px;
+      background-color: inherit;
+      color: inherit;
+      border: 1px solid #888;
+      padding: 8px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 6px 12px;
+    }
+
+    #suggestion {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      background-color: rgba(200, 200, 200, 0.1);
+      border: 1px solid #888;
+      white-space: pre-wrap;
+      color: inherit;
+    }
   </style>
 </head>
 <body>
-  <h2>Suggest Response:</h2>
-  <div id="suggestion">Generating...</div>
+  <h2>AI Email Assistant</h2>
+  <label for="instruction">Instructions to the AI:</label>
+  <textarea id="instruction">Craft a professional, helpful, and friendly email reply to the most recent message in the email chain below. Your response should be clear, concise, and suitable for business communication. Use earlier emails in the chain only as background context.
+
+Do not include a subject line, greeting, closing signature, sign-off, or your name. Respond only with the body of the email.
+
+If the most recent message in the chain does not require a response, reply with a short and polite explanation for why no response is needed. Do not make assumptions or add new information not found in the email.
+  </textarea>
+
+  <button id="generateBtn">Generate Suggestion</button>
+  <div id="suggestion">Waiting for input...</div>
 
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
@@ -33,24 +70,21 @@
 
     function applyTheme(theme) {
       const body = document.body;
-      if (theme && theme.bodyBackgroundColor) {
-        const bgColor = theme.bodyBackgroundColor.toLowerCase();
-        const isDark = getLuminance(bgColor) < 0.5;
-        body.className = isDark ? 'dark-theme' : 'light-theme';
-      }
+      const bgColor = theme?.bodyBackgroundColor?.toLowerCase() || "#ffffff";
+      const isDark = getLuminance(bgColor) < 0.5;
+      body.classList.remove("light-theme", "dark-theme");
+      body.classList.add(isDark ? "dark-theme" : "light-theme");
     }
 
-    function getLuminance(hexColor) {
-      if (!hexColor.startsWith("#") || hexColor.length !== 7) return 1;
-      const r = parseInt(hexColor.substr(1, 2), 16) / 255;
-      const g = parseInt(hexColor.substr(3, 2), 16) / 255;
-      const b = parseInt(hexColor.substr(5, 2), 16) / 255;
-
-      const [rLin, gLin, bLin] = [r, g, b].map(v =>
+    function getLuminance(hex) {
+      if (!hex.startsWith("#") || hex.length !== 7) return 1;
+      const r = parseInt(hex.substr(1, 2), 16) / 255;
+      const g = parseInt(hex.substr(3, 2), 16) / 255;
+      const b = parseInt(hex.substr(5, 2), 16) / 255;
+      const [rl, gl, bl] = [r, g, b].map(v =>
         v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
       );
-
-      return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
+      return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
     }
   </script>
   <script src="https://grant-ccof.github.io/ccofOutlookAddIn/taskpane.js"></script>
