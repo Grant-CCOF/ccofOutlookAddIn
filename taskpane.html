@@ -29,8 +29,8 @@
       if (Office.context.officeTheme) {
         applyTheme(Office.context.officeTheme);
       }
-    }
-                   
+    });
+
     function applyTheme(theme) {
       const body = document.body;
       if (theme && theme.bodyBackgroundColor) {
@@ -40,22 +40,17 @@
       }
     }
 
-    // Helper function to calculate luminance from hex color
     function getLuminance(hexColor) {
-      // Ensure format is #rrggbb
       if (!hexColor.startsWith("#") || hexColor.length !== 7) return 1;
-
       const r = parseInt(hexColor.substr(1, 2), 16) / 255;
       const g = parseInt(hexColor.substr(3, 2), 16) / 255;
       const b = parseInt(hexColor.substr(5, 2), 16) / 255;
 
-      const a = [r, g, b].map(v => {
-        return v <= 0.03928
-          ? v / 12.92
-          : Math.pow((v + 0.055) / 1.055, 2.4);
-      });
+      const [rLin, gLin, bLin] = [r, g, b].map(v =>
+        v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+      );
 
-      return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+      return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
     }
   </script>
   <script src="https://grant-ccof.github.io/ccofOutlookAddIn/taskpane.js"></script>
