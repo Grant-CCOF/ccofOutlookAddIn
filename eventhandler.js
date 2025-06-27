@@ -360,17 +360,29 @@ async function getPriorityFromLLM(msg) {
 }
 
 async function getInboxMessages() {
-  console.log("Getting inbox messages...");
+  console.log("Getting all inbox messages...");
   const token = await getAccessToken();
-  const res = await fetch(`${GRAPH_BASE}/me/mailFolders/inbox/messages?$top=50`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json"
-    }
-  });
-  const data = await res.json();
-  console.log("Inbox fetch complete.");
-  return data.value || [];
+
+  let url = `${GRAPH_BASE}/me/mailFolders/inbox/messages?$top=50`;
+  const allMessages = [];
+
+  while (url) {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json"
+      }
+    });
+
+    const data = await res.json();
+    allMessages.push(...(data.value || []));
+    console.log(`Fetched ${allMessages.length} messages so far...`);
+
+    url = data["@odata.nextLink"]; // Advance to next page
+  }
+
+  console.log(`Total inbox messages retrieved: ${allMessages.length}`);
+  return allMessages;
 }
 
 async function getSentMessages() {
