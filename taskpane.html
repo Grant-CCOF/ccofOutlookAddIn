@@ -29,14 +29,8 @@
       if (Office.context.officeTheme) {
         applyTheme(Office.context.officeTheme);
       }
-
-      // Listen for theme changes
-      Office.context.document.addHandlerAsync(
-        Office.EventType.OfficeThemeChanged,
-        (args) => applyTheme(args)
-      );
-    });
-
+    }
+                   
     function applyTheme(theme) {
       const body = document.body;
       if (theme && theme.bodyBackgroundColor) {
