@@ -3,12 +3,62 @@
 <head>
   <meta charset="utf-8" />
   <title>AI Email Assistant - Background Event Handler</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .light-theme {
+      background-color: white;
+      color: black;
+    }
+    .dark-theme {
+      background-color: #1e1e1e;
+      color: white;
+    }
+  </style>
 </head>
 <body>
   <h2>Email Assistant</h2>
   <div id="suggestion">Please wait while we load the processor</div>
+
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+  <script>
+    Office.onReady(() => {
+      if (Office.context.officeTheme) {
+        applyTheme(Office.context.officeTheme);
+      }
+
+      // Optional: Listen for runtime theme changes
+      Office.context.document?.addHandlerAsync?.(
+        Office.EventType.OfficeThemeChanged,
+        (args) => applyTheme(args)
+      );
+    });
+
+    function applyTheme(theme) {
+      const body = document.body;
+      if (theme && theme.bodyBackgroundColor) {
+        const bgColor = theme.bodyBackgroundColor.toLowerCase();
+        const isDark = getLuminance(bgColor) < 0.5;
+        body.className = isDark ? 'dark-theme' : 'light-theme';
+      }
+    }
+
+    function getLuminance(hexColor) {
+      if (!hexColor.startsWith("#") || hexColor.length !== 7) return 1;
+      const r = parseInt(hexColor.substr(1, 2), 16) / 255;
+      const g = parseInt(hexColor.substr(3, 2), 16) / 255;
+      const b = parseInt(hexColor.substr(5, 2), 16) / 255;
+
+      const [rLin, gLin, bLin] = [r, g, b].map(v =>
+        v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+      );
+
+      return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
+    }
+  </script>
   <script src="https://grant-ccof.github.io/ccofOutlookAddIn/eventhandler.js"></script>
 </body>
 </html>
