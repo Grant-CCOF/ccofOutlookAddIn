@@ -29,12 +29,6 @@
       if (Office.context.officeTheme) {
         applyTheme(Office.context.officeTheme);
       }
-
-      // Optional: Listen for runtime theme changes
-      Office.context.document?.addHandlerAsync?.(
-        Office.EventType.OfficeThemeChanged,
-        (args) => applyTheme(args)
-      );
     });
 
     function applyTheme(theme) {
