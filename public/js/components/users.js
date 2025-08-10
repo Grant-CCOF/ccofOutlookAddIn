@@ -1,0 +1,632 @@
+// Capital Choice Platform - Users Component
+
+const UsersComponent = {
+    // Component state
+    state: {
+        users: [],
+        filters: {
+            role: '',
+            status: '',
+            search: '',
+            sortBy: 'created_at',
+            sortOrder: 'desc'
+        },
+        currentPage: 1,
+        totalPages: 1,
+        selectedUser: null
+    },
+    
+    // Render users list
+    async render() {
+        try {
+            App.showLoading(true);
+            
+            // Check permissions
+            if (!Auth.isAdmin()) {
+                App.showError('Access denied');
+                Router.navigate('/dashboard');
+                return;
+            }
+            
+            // Set page actions
+            DOM.setHTML('pageActions', `
+                <button class="btn btn-primary" onclick="UsersComponent.showCreateModal()">
+                    <i class="fas fa-plus"></i> Add User
+                </button>
+                <button class="btn btn-outline" onclick="UsersComponent.exportUsers()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            `);
+            
+            // Render layout
+            const content = `
+                <div class="users-container">
+                    <!-- Stats Row -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <div class="stat-value" id="totalUsers">0</div>
+                                <div class="stat-label">Total Users</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card warning">
+                                <div class="stat-value" id="pendingUsers">0</div>
+                                <div class="stat-label">Pending Approval</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card success">
+                                <div class="stat-value" id="activeUsers">0</div>
+                                <div class="stat-label">Active Users</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card danger">
+                                <div class="stat-value" id="suspendedUsers">0</div>
+                                <div class="stat-label">Suspended</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Filters -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="filter-bar">
+                                <div class="filter-group">
+                                    <div class="search-box">
+                                        <i class="fas fa-search search-icon"></i>
+                                        <input type="text" 
+                                               id="userSearch" 
+                                               class="search-input" 
+                                               placeholder="Search users...">
+                                    </div>
+                                </div>
+                                
+                                <div class="filter-group">
+                                    <label class="filter-label">Role:</label>
+                                    <select id="roleFilter" class="form-control filter-select">
+                                        <option value="">All Roles</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="project_manager">Project Manager</option>
+                                        <option value="installation_company">Installation Company</option>
+                                        <option value="operations">Operations</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="filter-group">
+                                    <label class="filter-label">Status:</label>
+                                    <select id="statusFilter" class="form-control filter-select">
+                                        <option value="">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="suspended">Suspended</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="filter-group">
+                                    <button class="btn btn-outline" id="resetFilters">
+                                        <i class="fas fa-redo"></i> Reset
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Users Table -->
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-wrapper">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Role</th>
+                                            <th>Company</th>
+                                            <th>Status</th>
+                                            <th>Joined</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersTableBody">
+                                        <!-- Users will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <div id="usersPagination" class="pagination mt-3">
+                                <!-- Pagination will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            DOM.setHTML('pageContent', content);
+            
+            // Initialize event listeners
+            this.initializeEventListeners();
+            
+            // Load users
+            await this.loadUsers();
+            
+        } catch (error) {
+            Config.error('Failed to render users:', error);
+            App.showError('Failed to load users');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+    
+    // Initialize event listeners
+    initializeEventListeners() {
+        // Search
+        const searchInput = DOM.get('userSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', DOM.debounce((e) => {
+                this.state.filters.search = e.target.value;
+                this.loadUsers();
+            }, 300));
+        }
+        
+        // Role filter
+        DOM.on('roleFilter', 'change', (e) => {
+            this.state.filters.role = e.target.value;
+            this.loadUsers();
+        });
+        
+        // Status filter
+        DOM.on('statusFilter', 'change', (e) => {
+            this.state.filters.status = e.target.value;
+            this.loadUsers();
+        });
+        
+        // Reset filters
+        DOM.on('resetFilters', 'click', () => {
+            this.resetFilters();
+        });
+    },
+    
+    // Load users
+    async loadUsers() {
+        try {
+            const params = {
+                page: this.state.currentPage,
+                limit: Config.DEFAULT_PAGE_SIZE,
+                ...this.state.filters
+            };
+            
+            const response = await API.users.getAll(params);
+            
+            this.state.users = response.data || response;
+            this.state.totalPages = response.totalPages || 1;
+            
+            this.renderUsers();
+            this.renderPagination();
+            this.updateStats();
+            
+        } catch (error) {
+            Config.error('Failed to load users:', error);
+            this.renderEmptyState();
+        }
+    },
+    
+    // Render users
+    renderUsers() {
+        const tbody = DOM.get('usersTableBody');
+        
+        if (!tbody) return;
+        
+        if (this.state.users.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">No users found</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = this.state.users.map(user => this.renderUserRow(user)).join('');
+    },
+    
+    // Render user row
+    renderUserRow(user) {
+        const status = this.getUserStatus(user);
+        const roleConfig = Config.USER_ROLES[user.role] || {};
+        
+        return `
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <img src="${user.avatar || '/images/default-avatar.png'}" 
+                             class="user-avatar-sm mr-2" alt="${user.name}">
+                        <div>
+                            <div class="font-weight-medium">${user.name}</div>
+                            <small class="text-muted">${user.email}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge badge-${roleConfig.color || 'secondary'}">
+                        <i class="fas ${roleConfig.icon || 'fa-user'}"></i> 
+                        ${roleConfig.label || user.role}
+                    </span>
+                </td>
+                <td>${user.company || '-'}</td>
+                <td>
+                    <span class="badge badge-${status.color}">
+                        ${status.label}
+                    </span>
+                </td>
+                <td>${Formatter.date(user.created_at)}</td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline" 
+                                onclick="UsersComponent.viewUser(${user.id})"
+                                title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline" 
+                                onclick="UsersComponent.editUser(${user.id})"
+                                title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        
+                        ${!user.approved ? `
+                            <button class="btn btn-sm btn-success" 
+                                    onclick="UsersComponent.approveUser(${user.id})"
+                                    title="Approve">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        ` : ''}
+                        
+                        ${user.approved && !user.suspended ? `
+                            <button class="btn btn-sm btn-warning" 
+                                    onclick="UsersComponent.suspendUser(${user.id})"
+                                    title="Suspend">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                        ` : ''}
+                        
+                        ${user.suspended ? `
+                            <button class="btn btn-sm btn-info" 
+                                    onclick="UsersComponent.unsuspendUser(${user.id})"
+                                    title="Unsuspend">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        ` : ''}
+                        
+                        <button class="btn btn-sm btn-danger" 
+                                onclick="UsersComponent.deleteUser(${user.id})"
+                                title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    },
+    
+    // Get user status
+    getUserStatus(user) {
+        if (user.suspended) {
+            return { label: 'Suspended', color: 'danger' };
+        }
+        if (!user.approved) {
+            return { label: 'Pending', color: 'warning' };
+        }
+        return { label: 'Active', color: 'success' };
+    },
+    
+    // Update stats
+    updateStats() {
+        const total = this.state.users.length;
+        const pending = this.state.users.filter(u => !u.approved).length;
+        const active = this.state.users.filter(u => u.approved && !u.suspended).length;
+        const suspended = this.state.users.filter(u => u.suspended).length;
+        
+        DOM.setText('totalUsers', total);
+        DOM.setText('pendingUsers', pending);
+        DOM.setText('activeUsers', active);
+        DOM.setText('suspendedUsers', suspended);
+    },
+    
+    // Render pagination
+    renderPagination() {
+        const container = DOM.get('usersPagination');
+        
+        if (!container || this.state.totalPages <= 1) {
+            if (container) container.innerHTML = '';
+            return;
+        }
+        
+        let paginationHTML = '';
+        
+        // Previous button
+        paginationHTML += `
+            <button class="pagination-item ${this.state.currentPage === 1 ? 'disabled' : ''}"
+                    onclick="UsersComponent.goToPage(${this.state.currentPage - 1})"
+                    ${this.state.currentPage === 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+        `;
+        
+        // Page numbers
+        for (let i = 1; i <= Math.min(this.state.totalPages, 5); i++) {
+            paginationHTML += `
+                <button class="pagination-item ${i === this.state.currentPage ? 'active' : ''}"
+                        onclick="UsersComponent.goToPage(${i})">
+                    ${i}
+                </button>
+            `;
+        }
+        
+        // Next button
+        paginationHTML += `
+            <button class="pagination-item ${this.state.currentPage === this.state.totalPages ? 'disabled' : ''}"
+                    onclick="UsersComponent.goToPage(${this.state.currentPage + 1})"
+                    ${this.state.currentPage === this.state.totalPages ? 'disabled' : ''}>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        `;
+        
+        container.innerHTML = paginationHTML;
+    },
+    
+    // Go to page
+    goToPage(page) {
+        if (page < 1 || page > this.state.totalPages) return;
+        
+        this.state.currentPage = page;
+        this.loadUsers();
+    },
+    
+    // View user
+    async viewUser(userId) {
+        Router.navigate(`/users/${userId}`);
+    },
+    
+    // Edit user
+    async editUser(userId) {
+        const user = this.state.users.find(u => u.id === userId);
+        if (user) {
+            UserModals.showEditModal(user);
+        }
+    },
+    
+    // Approve user
+    async approveUser(userId) {
+        if (!confirm('Are you sure you want to approve this user?')) {
+            return;
+        }
+        
+        try {
+            await API.users.approve(userId);
+            App.showSuccess('User approved successfully');
+            await this.loadUsers();
+        } catch (error) {
+            App.showError('Failed to approve user');
+        }
+    },
+    
+    // Suspend user
+    async suspendUser(userId) {
+        const reason = prompt('Please provide a reason for suspension:');
+        if (!reason) return;
+        
+        try {
+            await API.users.suspend(userId, reason);
+            App.showSuccess('User suspended successfully');
+            await this.loadUsers();
+        } catch (error) {
+            App.showError('Failed to suspend user');
+        }
+    },
+    
+    // Unsuspend user
+    async unsuspendUser(userId) {
+        if (!confirm('Are you sure you want to unsuspend this user?')) {
+            return;
+        }
+        
+        try {
+            await API.users.unsuspend(userId);
+            App.showSuccess('User unsuspended successfully');
+            await this.loadUsers();
+        } catch (error) {
+            App.showError('Failed to unsuspend user');
+        }
+    },
+    
+    // Delete user
+    async deleteUser(userId) {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            return;
+        }
+        
+        try {
+            await API.users.delete(userId);
+            App.showSuccess('User deleted successfully');
+            await this.loadUsers();
+        } catch (error) {
+            App.showError('Failed to delete user');
+        }
+    },
+    
+    // Show create modal
+    showCreateModal() {
+        UserModals.showCreateModal();
+    },
+    
+    // Export users
+    async exportUsers() {
+        try {
+            // Implementation for export
+            App.showSuccess('Export started');
+        } catch (error) {
+            App.showError('Failed to export users');
+        }
+    },
+    
+    // Reset filters
+    resetFilters() {
+        this.state.filters = {
+            role: '',
+            status: '',
+            search: '',
+            sortBy: 'created_at',
+            sortOrder: 'desc'
+        };
+        
+        DOM.setValue('userSearch', '');
+        DOM.setValue('roleFilter', '');
+        DOM.setValue('statusFilter', '');
+        
+        this.loadUsers();
+    },
+    
+    // Render user detail
+    async renderDetail(userId) {
+        try {
+            App.showLoading(true);
+            
+            const user = await API.users.getById(userId);
+            const stats = await API.users.getStats(userId);
+            
+            this.state.selectedUser = user;
+            
+            const content = this.renderUserDetail(user, stats);
+            DOM.setHTML('pageContent', content);
+            
+        } catch (error) {
+            Config.error('Failed to load user details:', error);
+            App.showError('Failed to load user details');
+            Router.navigate('/users');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+    
+    // Render user detail view
+    renderUserDetail(user, stats) {
+        const status = this.getUserStatus(user);
+        const roleConfig = Config.USER_ROLES[user.role] || {};
+        
+        return `
+            <div class="user-detail">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 text-center">
+                                <img src="${user.avatar || '/images/default-avatar.png'}" 
+                                     class="user-avatar-large mb-3" alt="${user.name}">
+                                <h3>${user.name}</h3>
+                                <p class="text-muted">${user.email}</p>
+                                <span class="badge badge-${roleConfig.color || 'secondary'} mb-2">
+                                    <i class="fas ${roleConfig.icon || 'fa-user'}"></i> 
+                                    ${roleConfig.label || user.role}
+                                </span>
+                                <br>
+                                <span class="badge badge-${status.color}">
+                                    ${status.label}
+                                </span>
+                            </div>
+                            
+                            <div class="col-md-8">
+                                <h4>User Information</h4>
+                                <dl class="row">
+                                    <dt class="col-sm-3">Username</dt>
+                                    <dd class="col-sm-9">${user.username}</dd>
+                                    
+                                    <dt class="col-sm-3">Company</dt>
+                                    <dd class="col-sm-9">${user.company || '-'}</dd>
+                                    
+                                    <dt class="col-sm-3">Phone</dt>
+                                    <dd class="col-sm-9">${Formatter.phone(user.phone) || '-'}</dd>
+                                    
+                                    <dt class="col-sm-3">Position</dt>
+                                    <dd class="col-sm-9">${user.position || '-'}</dd>
+                                    
+                                    <dt class="col-sm-3">Joined</dt>
+                                    <dd class="col-sm-9">${Formatter.datetime(user.created_at)}</dd>
+                                    
+                                    <dt class="col-sm-3">Last Login</dt>
+                                    <dd class="col-sm-9">${user.last_login ? Formatter.timeAgo(user.last_login) : 'Never'}</dd>
+                                </dl>
+                                
+                                ${stats ? this.renderUserStats(stats, user.role) : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+    
+    // Render user stats
+    renderUserStats(stats, role) {
+        if (role === 'project_manager') {
+            return `
+                <h4 class="mt-4">Statistics</h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.projects_count || 0}</div>
+                            <div class="stat-label">Projects</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.active_projects || 0}</div>
+                            <div class="stat-label">Active</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.completed_projects || 0}</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (['installation_company', 'operations'].includes(role)) {
+            return `
+                <h4 class="mt-4">Statistics</h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.bids_count || 0}</div>
+                            <div class="stat-label">Total Bids</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.won_bids || 0}</div>
+                            <div class="stat-label">Won</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.win_rate || 0}%</div>
+                            <div class="stat-label">Win Rate</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-mini">
+                            <div class="stat-value">${stats.average_rating || 'N/A'}</div>
+                            <div class="stat-label">Avg Rating</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        return '';
+    }
+};
+
+// Register component
+window.UsersComponent = UsersComponent;
