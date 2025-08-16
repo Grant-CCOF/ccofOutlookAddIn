@@ -1,4 +1,4 @@
-// Capital Choice Platform - DOM Utilities
+// Capital Choice Platform - Enhanced DOM Utilities with Checkbox Support
 
 const DOM = {
     // Get element by ID
@@ -144,6 +144,63 @@ const DOM = {
         }
     },
     
+    // NEW: Check if checkbox/radio is checked
+    isChecked(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element && (element.type === 'checkbox' || element.type === 'radio')) {
+            return element.checked;
+        }
+        return false;
+    },
+    
+    // NEW: Set checkbox/radio checked state
+    setChecked(elementOrId, checked = true) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element && (element.type === 'checkbox' || element.type === 'radio')) {
+            element.checked = checked;
+        }
+    },
+    
+    // NEW: Toggle checkbox state
+    toggleChecked(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element && (element.type === 'checkbox' || element.type === 'radio')) {
+            element.checked = !element.checked;
+            return element.checked;
+        }
+        return false;
+    },
+    
+    // NEW: Check if element is disabled
+    isDisabled(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        return element ? element.disabled : false;
+    },
+    
+    // NEW: Set disabled state
+    setDisabled(elementOrId, disabled = true) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element) {
+            element.disabled = disabled;
+        }
+    },
+    
+    // NEW: Focus element
+    focus(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element && typeof element.focus === 'function') {
+            element.focus();
+        }
+    },
+    
+    // NEW: Blur element
+    blur(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        if (element && typeof element.blur === 'function') {
+            element.blur();
+        }
+    },
+    
     // Get attribute
     getAttribute(elementOrId, attribute) {
         const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
@@ -223,106 +280,45 @@ const DOM = {
         }
     },
     
-    // Empty element
-    empty(elementOrId) {
+    // Clear element content
+    clear(elementOrId) {
         const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
         if (element) {
             element.innerHTML = '';
         }
     },
     
-    // Find parent
-    findParent(element, selector) {
-        let parent = element.parentElement;
-        while (parent) {
-            if (parent.matches(selector)) {
-                return parent;
-            }
-            parent = parent.parentElement;
-        }
-        return null;
+    // Check if element exists
+    exists(elementOrId) {
+        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
+        return element !== null && element !== undefined;
     },
     
-    // Find closest
-    closest(elementOrId, selector) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        return element ? element.closest(selector) : null;
-    },
-    
-    // Animate element
-    animate(elementOrId, keyframes, options = {}) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        if (element && element.animate) {
-            return element.animate(keyframes, options);
-        }
-    },
-    
-    // Fade in
-    fadeIn(elementOrId, duration = 300) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        if (element) {
-            element.style.opacity = '0';
-            element.style.display = '';
-            
-            this.animate(element, [
-                { opacity: '0' },
-                { opacity: '1' }
-            ], { duration, fill: 'forwards' });
-        }
-    },
-    
-    // Fade out
-    fadeOut(elementOrId, duration = 300) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        if (element) {
-            const animation = this.animate(element, [
-                { opacity: '1' },
-                { opacity: '0' }
-            ], { duration, fill: 'forwards' });
-            
-            if (animation) {
-                animation.onfinish = () => {
-                    element.style.display = 'none';
-                };
+    // NEW: Get form data as object
+    getFormData(formOrId) {
+        const form = typeof formOrId === 'string' ? this.get(formOrId) : formOrId;
+        if (!form) return {};
+        
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (const [key, value] of formData.entries()) {
+            // Handle multiple values (like checkboxes with same name)
+            if (data[key]) {
+                if (Array.isArray(data[key])) {
+                    data[key].push(value);
+                } else {
+                    data[key] = [data[key], value];
+                }
+            } else {
+                data[key] = value;
             }
         }
+        
+        return data;
     },
-    
-    // Slide down
-    slideDown(elementOrId, duration = 300) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        if (element) {
-            element.style.overflow = 'hidden';
-            const height = element.scrollHeight;
-            
-            this.animate(element, [
-                { height: '0px' },
-                { height: `${height}px` }
-            ], { duration, fill: 'forwards' });
-        }
-    },
-    
-    // Slide up
-    slideUp(elementOrId, duration = 300) {
-        const element = typeof elementOrId === 'string' ? this.get(elementOrId) : elementOrId;
-        if (element) {
-            element.style.overflow = 'hidden';
-            const height = element.scrollHeight;
-            
-            const animation = this.animate(element, [
-                { height: `${height}px` },
-                { height: '0px' }
-            ], { duration, fill: 'forwards' });
-            
-            if (animation) {
-                animation.onfinish = () => {
-                    element.style.display = 'none';
-                };
-            }
-        }
-    },
-    
-    // Debounce
+
+    // Debounce method
     debounce(func, wait = 300) {
         let timeout;
         return function executedFunction(...args) {
@@ -335,24 +331,28 @@ const DOM = {
         };
     },
     
-    // Throttle
-    throttle(func, limit = 300) {
-        let inThrottle;
-        return function(...args) {
-            if (!inThrottle) {
-                func.apply(this, args);
-                inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
-            }
-        };
-    },
-    
-    // Ready
-    ready(fn) {
-        if (document.readyState !== 'loading') {
-            fn();
-        } else {
-            document.addEventListener('DOMContentLoaded', fn);
-        }
+    // NEW: Set form data from object
+    setFormData(formOrId, data) {
+        const form = typeof formOrId === 'string' ? this.get(formOrId) : formOrId;
+        if (!form || !data) return;
+        
+        Object.entries(data).forEach(([key, value]) => {
+            const elements = form.querySelectorAll(`[name="${key}"]`);
+            
+            elements.forEach(element => {
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    if (Array.isArray(value)) {
+                        element.checked = value.includes(element.value);
+                    } else {
+                        element.checked = element.value === value || value === true;
+                    }
+                } else {
+                    element.value = value;
+                }
+            });
+        });
     }
 };
+
+// Make DOM utility available globally
+window.DOM = DOM;

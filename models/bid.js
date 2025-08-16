@@ -84,6 +84,135 @@ class BidModel {
             [projectId, winnerId]
         );
     }
+
+    static async getCountByUserAndStatus(userId, status) {
+        const sql = `
+            SELECT COUNT(*) as count 
+            FROM bids 
+            WHERE user_id = ? AND status = ?
+        `;
+        try {
+            const result = await db.get(sql, [userId, status]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting bid count by user and status:', error);
+            return 0;
+        }
+    }
+
+    static async getCountForManagerProjects(managerId) {
+        const sql = `
+            SELECT COUNT(b.id) as count
+            FROM bids b
+            INNER JOIN projects p ON b.project_id = p.id
+            WHERE p.project_manager_id = ?
+        `;
+        try {
+            const result = await db.get(sql, [managerId]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting bid count for manager projects:', error);
+            return 0;
+        }
+    }
+
+    static async getAverageAmountByUser(userId) {
+        const sql = `
+            SELECT AVG(amount) as average 
+            FROM bids 
+            WHERE user_id = ?
+        `;
+        try {
+            const result = await db.get(sql, [userId]);
+            return result ? (result.average || 0) : 0;
+        } catch (error) {
+            logger.error('Error getting average bid amount:', error);
+            return 0;
+        }
+    }
+
+    static async getCountByPeriod(days) {
+        const sql = `
+            SELECT COUNT(*) as count 
+            FROM bids 
+            WHERE created_at >= datetime('now', '-' || ? || ' days')
+        `;
+        try {
+            const result = await db.get(sql, [days]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting bid count by period:', error);
+            return 0;
+        }
+    }
+
+    static async getAll() {
+        const sql = `
+            SELECT b.*, p.title as project_title, u.name as user_name, u.company
+            FROM bids b
+            LEFT JOIN projects p ON b.project_id = p.id
+            LEFT JOIN users u ON b.user_id = u.id
+            ORDER BY b.created_at DESC
+        `;
+        try {
+            return await db.all(sql);
+        } catch (error) {
+            logger.error('Error getting all bids:', error);
+            return [];
+        }
+    }
+
+    static async getRecent(limit = 5) {
+        const sql = `
+            SELECT b.*, p.title as project_title, u.name as user_name
+            FROM bids b
+            LEFT JOIN projects p ON b.project_id = p.id
+            LEFT JOIN users u ON b.user_id = u.id
+            ORDER BY b.created_at DESC
+            LIMIT ?
+        `;
+        try {
+            return await db.all(sql, [limit]);
+        } catch (error) {
+            logger.error('Error getting recent bids:', error);
+            return [];
+        }
+    }
+
+    static async getRecentByUser(userId, limit = 10) {
+        const sql = `
+            SELECT b.*, p.title as project_title, p.status as project_status
+            FROM bids b
+            LEFT JOIN projects p ON b.project_id = p.id
+            WHERE b.user_id = ?
+            ORDER BY b.created_at DESC
+            LIMIT ?
+        `;
+        try {
+            return await db.all(sql, [userId, limit]);
+        } catch (error) {
+            logger.error('Error getting recent bids by user:', error);
+            return [];
+        }
+    }
+
+    static async getRecentForManagerProjects(managerId, limit = 10) {
+        const sql = `
+            SELECT b.*, p.title as project_title, u.name as user_name, u.company
+            FROM bids b
+            INNER JOIN projects p ON b.project_id = p.id
+            LEFT JOIN users u ON b.user_id = u.id
+            WHERE p.project_manager_id = ?
+            ORDER BY b.created_at DESC
+            LIMIT ?
+        `;
+        try {
+            return await db.all(sql, [managerId, limit]);
+        } catch (error) {
+            logger.error('Error getting recent bids for manager projects:', error);
+            return [];
+        }
+    }
     
     static async delete(id) {
         const sql = `DELETE FROM bids WHERE id = ?`;

@@ -295,6 +295,7 @@ API.bids = {
 API.users = {
     getAll: (params) => API.get('/users', params),
     getById: (id) => API.get(`/users/${id}`),
+    create: (data) => API.post('/users/create', data),
     update: (id, data) => API.put(`/users/${id}`, data),
     delete: (id) => API.delete(`/users/${id}`),
     approve: (id) => API.post(`/users/${id}/approve`),

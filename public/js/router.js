@@ -1,12 +1,16 @@
 // Capital Choice Platform - Frontend Router
-// Fixed version with proper state handling
+// Fixed version with proper state handling and initialization management
 
 const Router = {
+    // Initialization flag to prevent double initialization
+    initialized: false,
+    
     // Routes configuration
     routes: {
         '/': 'dashboard',
         '/dashboard': 'dashboard',
         '/projects': 'projects',
+        '/projects/active': 'projectsActive',
         '/projects/:id': 'projectDetail',
         '/bids': 'bids',
         '/bids/:id': 'bidDetail',
@@ -21,7 +25,7 @@ const Router = {
         '/404': 'notFound'
     },
     
-    // Current route
+    // Current route state
     currentRoute: null,
     currentParams: {},
     
@@ -30,7 +34,16 @@ const Router = {
     
     // Initialize router
     init() {
+        // Prevent double initialization
+        if (this.initialized) {
+            console.log('Router already initialized, skipping...');
+            return;
+        }
+        
         console.log('Initializing router...');
+        
+        // Set initialized flag immediately to prevent race conditions
+        this.initialized = true;
         
         // Register route handlers
         this.registerHandlers();
@@ -66,6 +79,14 @@ const Router = {
                 } else {
                     console.warn('ProjectsComponent not loaded');
                     this.renderPlaceholder('Projects');
+                }
+            },
+            projectsActive: () => {
+                if (typeof ProjectsComponent !== 'undefined') {
+                    ProjectsComponent.renderWithFilter('bidding'); // 'bidding' status = active projects
+                } else {
+                    console.warn('ProjectsComponent not loaded');
+                    this.renderPlaceholder('Active Projects');
                 }
             },
             projectDetail: (params) => {
@@ -262,39 +283,45 @@ const Router = {
         
         // Project manager routes
         const pmRoutes = ['/ratings'];
-        if (pmRoutes.includes(route) && !['admin', 'project_manager'].includes(userRole)) {
+        if (pmRoutes.includes(route) && 
+            !['admin', 'project_manager'].includes(userRole)) {
             return false;
         }
         
         return true;
     },
     
-    // Update UI for route
+    // Update UI for route - FIXED VERSION with proper error handling
     updateUI(route, path) {
-        // Update active nav items
-        document.querySelectorAll('.nav-link, .menu-link').forEach(link => {
-            const linkRoute = link.getAttribute('data-route');
-            if (linkRoute) {
-                const isActive = path.startsWith('/' + linkRoute);
-                link.classList.toggle('active', isActive);
+        try {
+            // Update active nav items
+            document.querySelectorAll('.nav-link, .menu-link').forEach(link => {
+                const linkRoute = link.getAttribute('data-route');
+                if (linkRoute) {
+                    const isActive = path.startsWith('/' + linkRoute);
+                    link.classList.toggle('active', isActive);
+                }
+            });
+            
+            // Update page title in browser tab only
+            const routeName = this.routes[route];
+            const title = this.getPageTitle(routeName);
+            document.title = `${title} - Capital Choice`;
+            
+            // CRITICAL FIX: Update app state with proper error handling and checks
+            if (typeof App !== 'undefined' && 
+                App.initialized && 
+                typeof App.currentRoute !== 'undefined') {
+                try {
+                    App.currentRoute = path;
+                } catch (error) {
+                    console.warn('Could not update App currentRoute:', error);
+                    // Continue execution - this is not a critical error
+                }
             }
-        });
-        
-        // Update page title
-        const routeName = this.routes[route];
-        const title = this.getPageTitle(routeName);
-        
-        if (DOM && DOM.setText) {
-            DOM.setText('pageTitle', title);
-        }
-        document.title = `${title} - Capital Choice`;
-        
-        // Update breadcrumb
-        this.updateBreadcrumb(route, path);
-        
-        // Update app state if App exists and is initialized
-        if (typeof App !== 'undefined' && App.currentRoute !== undefined) {
-            App.currentRoute = path;
+        } catch (error) {
+            console.error('Error updating UI:', error);
+            // Don't let UI update errors break navigation
         }
     },
     
@@ -322,47 +349,73 @@ const Router = {
     
     // Update breadcrumb
     updateBreadcrumb(route, path) {
-        const breadcrumb = DOM.get('breadcrumb');
-        const currentPage = DOM.get('currentPage');
+        const breadcrumbContainer = DOM.get('breadcrumb');
+        if (!breadcrumbContainer) return;
         
-        if (!breadcrumb || !currentPage) return;
+        const pathParts = path.split('/').filter(part => part);
+        const breadcrumbs = [];
         
-        // Build breadcrumb trail
-        const parts = path.split('/').filter(p => p);
-        let breadcrumbHtml = '<li class="breadcrumb-item"><a href="#/dashboard">Home</a></li>';
+        // Always start with Home
+        breadcrumbs.push({
+            text: 'Home',
+            link: '#/dashboard',
+            active: path === '/dashboard'
+        });
         
-        if (parts.length > 0) {
-            parts.forEach((part, index) => {
-                const isLast = index === parts.length - 1;
-                const partPath = '/' + parts.slice(0, index + 1).join('/');
-                const partTitle = this.formatBreadcrumbPart(part);
-                
-                if (isLast) {
-                    currentPage.textContent = partTitle;
-                } else {
-                    breadcrumbHtml += `<li class="breadcrumb-item"><a href="#${partPath}">${partTitle}</a></li>`;
-                }
-            });
-        } else {
-            currentPage.textContent = 'Dashboard';
-        }
+        // Build breadcrumb from path parts
+        let currentPath = '';
+        pathParts.forEach((part, index) => {
+            currentPath += '/' + part;
+            const isLast = index === pathParts.length - 1;
+            const isNumeric = /^\d+$/.test(part);
+            
+            if (!isNumeric) {
+                breadcrumbs.push({
+                    text: this.formatBreadcrumbText(part),
+                    link: isLast ? null : '#' + currentPath,
+                    active: isLast
+                });
+            } else if (isLast) {
+                // For detail pages, show the ID
+                breadcrumbs.push({
+                    text: `#${part}`,
+                    link: null,
+                    active: true
+                });
+            }
+        });
         
-        const breadcrumbList = breadcrumb.querySelector('.breadcrumb-list');
-        if (breadcrumbList) {
-            breadcrumbList.innerHTML = breadcrumbHtml + 
-                `<li class="breadcrumb-item active">${currentPage.textContent}</li>`;
-        }
+        // Render breadcrumb
+        this.renderBreadcrumb(breadcrumbs);
     },
     
-    // Format breadcrumb part
-    formatBreadcrumbPart(part) {
+    // Format breadcrumb text
+    formatBreadcrumbText(part) {
         // Handle special cases
-        if (part === 'bids') return 'Bids';
-        if (part === 'users') return 'Users';
         if (part === 'projects') return 'Projects';
         
         // Capitalize first letter
         return part.charAt(0).toUpperCase() + part.slice(1);
+    },
+    
+    // Render breadcrumb
+    renderBreadcrumb(breadcrumbs) {
+        const breadcrumbContainer = DOM.get('breadcrumb');
+        if (!breadcrumbContainer) return;
+        
+        const breadcrumbHTML = breadcrumbs.map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            
+            if (crumb.active || !crumb.link) {
+                return `<li class="breadcrumb-item active">${crumb.text}</li>`;
+            } else {
+                return `<li class="breadcrumb-item">
+                    <a href="${crumb.link}">${crumb.text}</a>
+                </li>`;
+            }
+        }).join('');
+        
+        breadcrumbContainer.innerHTML = breadcrumbHTML;
     },
     
     // Track navigation (analytics)
@@ -378,6 +431,26 @@ const Router = {
                 page_path: path
             });
         }
+    },
+    
+    // Helper method to get query parameters
+    getQueryParams() {
+        const hash = window.location.hash;
+        const queryIndex = hash.indexOf('?');
+        
+        if (queryIndex === -1) {
+            return {};
+        }
+        
+        const queryString = hash.substring(queryIndex + 1);
+        const params = new URLSearchParams(queryString);
+        const result = {};
+        
+        for (const [key, value] of params) {
+            result[key] = value;
+        }
+        
+        return result;
     },
     
     // Render placeholder for components not yet loaded
@@ -398,42 +471,6 @@ const Router = {
         if (DOM && DOM.setHTML) {
             DOM.setHTML('pageContent', content);
         }
-    },
-    
-    // Helper methods
-    back() {
-        window.history.back();
-    },
-    
-    forward() {
-        window.history.forward();
-    },
-    
-    reload() {
-        this.handleRouteChange();
-    },
-    
-    getParam(name) {
-        return this.currentParams[name];
-    },
-    
-    getQueryParams() {
-        const hash = window.location.hash;
-        const queryIndex = hash.indexOf('?');
-        
-        if (queryIndex === -1) {
-            return {};
-        }
-        
-        const queryString = hash.substring(queryIndex + 1);
-        const params = new URLSearchParams(queryString);
-        const result = {};
-        
-        for (const [key, value] of params) {
-            result[key] = value;
-        }
-        
-        return result;
     },
     
     // Render methods for simple pages
@@ -495,7 +532,15 @@ const Router = {
                     <h3 class="card-title">Help & Support</h3>
                 </div>
                 <div class="card-body">
-                    <p>Need help? Contact us at support@capitalchoice.com</p>
+                    <h5>Contact Information</h5>
+                    <p>Email: support@capitalchoice.com</p>
+                    <p>Phone: 1-800-CAPITAL</p>
+                    
+                    <h5>Quick Start Guide</h5>
+                    <p>For detailed instructions on using the platform, please contact support.</p>
+                    
+                    <h5>System Requirements</h5>
+                    <p>Modern web browser with JavaScript enabled</p>
                 </div>
             </div>
         `;
@@ -515,17 +560,59 @@ const Router = {
                 <p class="empty-state-description">
                     The page you're looking for doesn't exist or you don't have permission to access it.
                 </p>
-                <button class="btn btn-primary" onclick="Router.navigate('/dashboard')">
-                    Go to Dashboard
-                </button>
+                <div class="empty-state-action">
+                    <a href="#/dashboard" class="btn btn-primary">
+                        <i class="fas fa-home mr-2"></i>Go to Dashboard
+                    </a>
+                </div>
             </div>
         `;
         
         if (DOM && DOM.setHTML) {
             DOM.setHTML('pageContent', content);
         }
+    },
+    
+    // Helper methods for navigation control
+    back() {
+        window.history.back();
+    },
+    
+    forward() {
+        window.history.forward();
+    },
+    
+    reload() {
+        this.handleRouteChange();
+    },
+    
+    // Get current route parameter
+    getParam(name) {
+        return this.currentParams[name];
+    },
+    
+    // Get all current parameters
+    getParams() {
+        return { ...this.currentParams };
+    },
+    
+    // Get current route
+    getCurrentRoute() {
+        return this.currentRoute;
+    },
+    
+    // Check if current route matches pattern
+    isCurrentRoute(pattern) {
+        if (!this.currentRoute) return false;
+        
+        if (typeof pattern === 'string') {
+            return this.currentRoute === pattern;
+        }
+        
+        if (pattern instanceof RegExp) {
+            return pattern.test(this.currentRoute);
+        }
+        
+        return false;
     }
 };
-
-// Make Router globally available
-window.Router = Router;

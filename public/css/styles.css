@@ -1530,3 +1530,308 @@ body.sidebar-collapsed .main-content {
     color: var(--gray-color);
     margin-bottom: var(--spacing-lg);
 }
+
+/* Nav Actions - Simplified */
+.nav-actions {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Simplified User Display */
+.nav-user-simple {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.user-name-display {
+    color: black;
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    min-width: 0; /* Allows text to shrink if needed */
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(220, 53, 69, 0.9);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.logout-btn:hover {
+    background: #dc3545;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
+}
+
+.logout-btn:active {
+    transform: translateY(0);
+}
+
+.logout-btn i {
+    font-size: 0.8rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .nav-user-simple {
+        gap: 0.5rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .user-name-display {
+        font-size: 0.85rem;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .logout-btn {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+    }
+    
+    .logout-btn span {
+        display: none; /* Hide "Logout" text on mobile, keep only icon */
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-user-simple {
+        gap: 0.4rem;
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .user-name-display {
+        max-width: 80px;
+        font-size: 0.8rem;
+    }
+    
+    .logout-btn {
+        padding: 0.3rem 0.5rem;
+    }
+}
+
+/* Quick Create User Card Styles */
+#createUserCard {
+    background: #fff;
+    border: 1px solid #e3e6f0;
+    border-radius: 8px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    transition: all 0.3s ease;
+}
+
+#createUserCard:hover {
+    box-shadow: 0 0.25rem 2rem 0 rgba(58, 59, 69, 0.2);
+}
+
+#createUserCard .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px 8px 0 0;
+    padding: 1rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+#createUserCard .card-header:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+#createUserCard .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+#createUserCardBody {
+    padding: 1.5rem;
+    background: #f8f9fc;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Form Styling */
+#quickCreateUserForm .form-group {
+    margin-bottom: 1rem;
+}
+
+#quickCreateUserForm label {
+    font-weight: 600;
+    color: #5a5c69;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+#quickCreateUserForm .form-control {
+    border: 1px solid #d1d3e2;
+    border-radius: 4px;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.15s ease-in-out;
+}
+
+#quickCreateUserForm .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+#quickCreateUserForm .form-control::placeholder {
+    color: #a7adb5;
+    font-size: 0.875rem;
+}
+
+#quickCreateUserForm .text-danger {
+    color: #e74a3b;
+}
+
+#quickCreateUserForm .form-text {
+    font-size: 0.75rem;
+    color: #858796;
+    margin-top: 0.25rem;
+}
+
+/* Custom Checkbox */
+#quickCreateUserForm .custom-control-label {
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.875rem;
+    color: #5a5c69;
+}
+
+#quickCreateUserForm .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+/* Form Actions */
+#quickCreateUserForm .form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e3e6f0;
+}
+
+#quickCreateUserForm .btn {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+}
+
+#quickCreateUserForm .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+}
+
+#quickCreateUserForm .btn-primary:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+}
+
+#quickCreateUserForm .btn-outline {
+    background: white;
+    border: 1px solid #d1d3e2;
+    color: #5a5c69;
+}
+
+#quickCreateUserForm .btn-outline:hover {
+    background: #f8f9fc;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+/* Toggle Icon Animation */
+#createCardToggleIcon {
+    transition: transform 0.3s ease;
+    color: white;
+    font-size: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #quickCreateUserForm .row {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    #quickCreateUserForm .col-md-6,
+    #quickCreateUserForm .col-md-4 {
+        padding-left: 0;
+        padding-right: 0;
+        margin-bottom: 0.5rem;
+    }
+    
+    #quickCreateUserForm .form-actions {
+        flex-direction: column;
+    }
+    
+    #quickCreateUserForm .btn {
+        width: 100%;
+    }
+}
+
+/* Loading State for Form */
+#quickCreateUserForm.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+#quickCreateUserForm.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Success Message Animation */
+.success-animation {
+    animation: successPulse 0.5s ease-out;
+}
+
+@keyframes successPulse {
+    0% {
+        transform: scale(1);
+        background-color: #f8f9fc;
+    }
+    50% {
+        transform: scale(1.02);
+        background-color: #d1f2eb;
+    }
+    100% {
+        transform: scale(1);
+        background-color: #f8f9fc;
+    }
+}

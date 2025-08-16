@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body, param } = require('express-validator');
 const UserModel = require('../models/user');
+const ProjectModel = require('../models/project');
+const BidModel = require('../models/bid');
 const AuthService = require('../services/authService');
 const emailService = require('../services/emailService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
@@ -26,6 +28,92 @@ router.get('/', [
     } catch (error) {
         logger.error('Error fetching users:', error);
         res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
+// Create new user (admin only)
+router.post('/create', [
+    authenticateToken,
+    requireRole('admin'),
+    body('username').isLength({ min: 3, max: 20 }).withMessage('Username must be 3-20 characters'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('role').isIn(['admin', 'project_manager', 'installation_company', 'operations'])
+        .withMessage('Valid role is required'),
+    body('company').optional(),
+    body('phone').optional(),
+    body('position').optional(),
+    body('approved').optional().isBoolean(),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { 
+            username, 
+            password, 
+            name, 
+            email, 
+            role, 
+            company, 
+            phone, 
+            position,
+            approved 
+        } = req.body;
+        
+        // Check if username already exists
+        const existingUser = await UserModel.getByUsername(username);
+        if (existingUser) {
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+        
+        // Check if email already exists
+        const existingEmail = await UserModel.getByEmail(email);
+        if (existingEmail) {
+            return res.status(409).json({ error: 'Email already registered' });
+        }
+        
+        // Hash password
+        const bcrypt = require('bcrypt');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Create user with admin-specified approval status
+        const userId = await UserModel.create({
+            username,
+            password: hashedPassword,
+            name,
+            email,
+            role,
+            company: company || null,
+            phone: phone || null,
+            position: position || null,
+            approved: approved ? 1 : 0,  // Admin can set immediate approval
+            suspended: 0
+        });
+        
+        // Get created user (without password)
+        const user = await UserModel.getById(userId);
+        const { password: _, ...userWithoutPassword } = user;
+        
+        // Send welcome email if approved
+        if (approved) {
+            try {
+                await emailService.sendWelcomeEmail(user);
+            } catch (emailError) {
+                logger.warn(`Failed to send welcome email to ${email}:`, emailError);
+                // Don't fail the user creation if email fails
+            }
+        }
+        
+        logger.info(`User created by admin ${req.user.username}: ${username} (${email})`);
+        
+        res.status(201).json({
+            message: 'User created successfully',
+            user: userWithoutPassword
+        });
+        
+    } catch (error) {
+        logger.error('Error creating user:', error);
+        res.status(500).json({ error: 'Failed to create user' });
     }
 });
 

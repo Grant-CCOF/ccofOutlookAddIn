@@ -698,6 +698,20 @@ const ProjectsComponent = {
     // Refresh projects
     async refreshProjects() {
         await this.loadProjects();
+    },
+
+    async renderWithFilter(status) {
+        // Set the filter
+        this.state.filters.status = status;
+        
+        // Render the normal projects view
+        await this.render();
+        
+        // Update the status filter dropdown to show the current filter
+        const statusFilter = DOM.get('statusFilter');
+        if (statusFilter) {
+            statusFilter.value = status;
+        }
     }
 };
 

@@ -13,7 +13,8 @@ const UsersComponent = {
         },
         currentPage: 1,
         totalPages: 1,
-        selectedUser: null
+        selectedUser: null,
+        createCardExpanded: true
     },
     
     // Render users list
@@ -66,6 +67,161 @@ const UsersComponent = {
                                 <div class="stat-value" id="suspendedUsers">0</div>
                                 <div class="stat-label">Suspended</div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Create User Card -->
+                    <div class="card mb-4" id="createUserCard">
+                        <div class="card-header" style="cursor: pointer;" onclick="UsersComponent.toggleCreateCard()">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-user-plus"></i> Quick Create User
+                                </h5>
+                                <i class="fas fa-chevron-${this.state.createCardExpanded ? 'up' : 'down'}" id="createCardToggleIcon"></i>
+                            </div>
+                        </div>
+                        <div class="card-body" id="createUserCardBody" style="${this.state.createCardExpanded ? '' : 'display: none;'}">
+                            <form id="quickCreateUserForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Full Name <span class="text-danger">*</span></label>
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="qc_name"
+                                                   name="name" 
+                                                   placeholder="Enter full name"
+                                                   required>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Username <span class="text-danger">*</span></label>
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="qc_username"
+                                                   name="username" 
+                                                   placeholder="Choose a username"
+                                                   required>
+                                            <small class="form-text text-muted">Must be unique, 3-20 characters</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Email <span class="text-danger">*</span></label>
+                                            <input type="email" 
+                                                   class="form-control" 
+                                                   id="qc_email"
+                                                   name="email" 
+                                                   placeholder="email@example.com"
+                                                   required>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Phone</label>
+                                            <input type="tel" 
+                                                   class="form-control" 
+                                                   id="qc_phone"
+                                                   name="phone" 
+                                                   placeholder="+1 (555) 123-4567">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Password <span class="text-danger">*</span></label>
+                                            <input type="password" 
+                                                   class="form-control" 
+                                                   id="qc_password"
+                                                   name="password" 
+                                                   placeholder="Enter password"
+                                                   required>
+                                            <small class="form-text text-muted">At least 8 characters</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label>Confirm Password <span class="text-danger">*</span></label>
+                                            <input type="password" 
+                                                   class="form-control" 
+                                                   id="qc_confirmPassword"
+                                                   name="confirmPassword" 
+                                                   placeholder="Re-enter password"
+                                                   required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>Role <span class="text-danger">*</span></label>
+                                            <select class="form-control" 
+                                                    id="qc_role"
+                                                    name="role" 
+                                                    required>
+                                                <option value="">Select role...</option>
+                                                <option value="admin">Admin</option>
+                                                <option value="project_manager">Project Manager</option>
+                                                <option value="installation_company">Installation Company</option>
+                                                <option value="operations">Operations</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>Company</label>
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="qc_company"
+                                                   name="company" 
+                                                   placeholder="Company name">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>Position</label>
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="qc_position"
+                                                   name="position" 
+                                                   placeholder="Job title">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="custom-control custom-checkbox">
+                                        <input type="checkbox" 
+                                               class="custom-control-input" 
+                                               id="qc_approved"
+                                               name="approved">
+                                        <label class="custom-control-label" for="qc_approved">
+                                            Approve user immediately (can access system right away)
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-check"></i> Create User
+                                    </button>
+                                    <button type="button" class="btn btn-outline" onclick="UsersComponent.resetCreateForm()">
+                                        <i class="fas fa-times"></i> Clear Form
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                     
@@ -147,6 +303,9 @@ const UsersComponent = {
             
             // Initialize event listeners
             this.initializeEventListeners();
+
+            // Initialize create form
+            this.initializeCreateForm();
             
             // Load users
             await this.loadUsers();
@@ -186,6 +345,125 @@ const UsersComponent = {
         DOM.on('resetFilters', 'click', () => {
             this.resetFilters();
         });
+    },
+
+    // Toggle create card
+    toggleCreateCard() {
+        this.state.createCardExpanded = !this.state.createCardExpanded;
+        const cardBody = DOM.get('createUserCardBody');
+        const icon = DOM.get('createCardToggleIcon');
+        
+        if (this.state.createCardExpanded) {
+            cardBody.style.display = 'block';
+            icon.className = 'fas fa-chevron-up';
+        } else {
+            cardBody.style.display = 'none';
+            icon.className = 'fas fa-chevron-down';
+        }
+    },
+
+    // Handle quick create user
+    async handleQuickCreateUser() {
+        try {
+            const form = DOM.get('quickCreateUserForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Process checkbox
+            data.approved = formData.has('approved') ? 1 : 0;
+            
+            // Validate data
+            const validation = this.validateUserData(data);
+            if (!validation.valid) {
+                App.showError(validation.message);
+                return;
+            }
+            
+            App.showLoading(true);
+            
+            // Create user
+            await API.users.create(data);
+            
+            App.showSuccess('User created successfully');
+            
+            // Reset form
+            this.resetCreateForm();
+            
+            // Collapse the card
+            this.state.createCardExpanded = false;
+            this.toggleCreateCard();
+            
+            // Reload users list
+            await this.loadUsers();
+            
+        } catch (error) {
+            Config.error('Failed to create user:', error);
+            App.showError(error.message || 'Failed to create user');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+    
+    // Reset create form
+    resetCreateForm() {
+        const form = DOM.get('quickCreateUserForm');
+        if (form) {
+            form.reset();
+        }
+    },
+    
+    // Validate user data
+    validateUserData(data) {
+        // Name validation
+        if (!data.name || data.name.trim().length < 2) {
+            return { valid: false, message: 'Name must be at least 2 characters' };
+        }
+        
+        // Username validation
+        if (!data.username || data.username.length < 3 || data.username.length > 20) {
+            return { valid: false, message: 'Username must be 3-20 characters' };
+        }
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!data.email || !emailRegex.test(data.email)) {
+            return { valid: false, message: 'Please enter a valid email address' };
+        }
+        
+        // Password validation
+        if (!data.password || data.password.length < 8) {
+            return { valid: false, message: 'Password must be at least 8 characters' };
+        }
+        
+        if (data.password !== data.confirmPassword) {
+            return { valid: false, message: 'Passwords do not match' };
+        }
+        
+        // Role validation
+        if (!data.role) {
+            return { valid: false, message: 'Please select a role' };
+        }
+        
+        // Phone validation (optional)
+        if (data.phone) {
+            const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+            if (!phoneRegex.test(data.phone)) {
+                return { valid: false, message: 'Please enter a valid phone number' };
+            }
+        }
+        
+        return { valid: true };
+    },
+    
+    // Initialize create form
+    initializeCreateForm() {
+        const form = DOM.get('quickCreateUserForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleQuickCreateUser();
+            });
+        }
     },
     
     // Load users

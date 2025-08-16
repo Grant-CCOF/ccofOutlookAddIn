@@ -4,7 +4,7 @@
 const App = {
     // Application state - properly initialized
     initialized: false,
-    currentRoute: null,
+    currentRoute: null, // Initialize as null to avoid undefined errors
     socket: null,
     currentUser: null,
     
@@ -50,8 +50,9 @@ const App = {
                 throw new Error('Failed to get user data');
             }
             
-            // Store user in state
+            // Store user in state - CRITICAL: Set currentRoute BEFORE router init
             this.currentUser = user;
+            this.currentRoute = '/dashboard'; // Initialize route before router
             State.setUser(user);
             
             // Hide login page
@@ -64,7 +65,7 @@ const App = {
             
             console.log('Initializing components...');
             
-            // Initialize components
+            // Initialize components first
             this.initializeComponents();
             
             // Setup event listeners
@@ -79,14 +80,14 @@ const App = {
             // Update navigation with user info
             this.updateNavigation();
             
-            // Setup router AFTER everything else is initialized
+            // CRITICAL: Mark as initialized BEFORE router init to prevent race conditions
+            this.initialized = true;
+            
+            // NOW initialize router - this order is critical
             Router.init();
             
             // Hide loading overlay
             this.showLoading(false);
-            
-            // Mark as initialized
-            this.initialized = true;
             
             console.log('Application initialized successfully');
             this.showSuccess(`Welcome back, ${user.name}!`);
@@ -107,29 +108,177 @@ const App = {
         }
     },
     
-    // Update navigation with user info
-    updateNavigation() {
-        const user = this.currentUser;
-        if (!user) return;
+    // Initialize components
+    initializeComponents() {
+        console.log('Initializing UI components...');
         
-        // Update user name in navigation
-        DOM.setText('userName', user.name || 'User');
-        DOM.setText('dropdownUserName', user.name || 'User');
+        // Initialize utility components
+        if (typeof Utils !== 'undefined' && Utils.init) {
+            Utils.init();
+        }
         
-        // Format and display role (using correct Formatter method)
-        const formattedRole = typeof Formatter !== 'undefined' && Formatter.role ? 
-            Formatter.role(user.role) : 
-            user.role.replace(/_/g, ' ').toUpperCase();
-        DOM.setText('dropdownUserRole', formattedRole);
+        // Initialize state management
+        if (typeof State !== 'undefined' && State.init) {
+            State.init();
+        }
+        
+        // Initialize notification system
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.init) {
+            NotificationManager.init();
+        }
+        
+        // Initialize modals
+        if (typeof ModalManager !== 'undefined' && ModalManager.init) {
+            ModalManager.init();
+        }
+        
+        // Initialize forms
+        if (typeof FormManager !== 'undefined' && FormManager.init) {
+            FormManager.init();
+        }
+        
+        // Initialize file uploader
+        if (typeof FileUploader !== 'undefined' && FileUploader.init) {
+            FileUploader.init();
+        }
+        
+        console.log('UI components initialized');
+    },
+    
+    // Setup event listeners
+    setupEventListeners() {
+        // Logout button
+        const logoutBtn = DOM.get('logoutBtn');
+        if (logoutBtn && !logoutBtn.dataset.initialized) {
+            logoutBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await this.logout();
+            });
+            logoutBtn.dataset.initialized = 'true';
+        }
+        
+        // Sidebar toggle
+        const sidebarToggle = DOM.get('sidebarToggle');
+        if (sidebarToggle && !sidebarToggle.dataset.initialized) {
+            sidebarToggle.addEventListener('click', () => {
+                document.body.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('sidebarCollapsed', 
+                    document.body.classList.contains('sidebar-collapsed'));
+            });
+            sidebarToggle.dataset.initialized = 'true';
+        }
+        
+        // Window resize handler
+        if (!window.appResizeHandlerInitialized) {
+            window.addEventListener('resize', () => this.handleResize());
+            window.appResizeHandlerInitialized = true;
+        }
+        
+        // Global error handler
+        if (!window.appErrorHandlerInitialized) {
+            window.addEventListener('error', (event) => {
+                console.error('Global error:', event.error);
+                this.showError('An unexpected error occurred');
+            });
+            
+            window.addEventListener('unhandledrejection', (event) => {
+                console.error('Unhandled promise rejection:', event.reason);
+                this.showError('An unexpected error occurred');
+            });
+            window.appErrorHandlerInitialized = true;
+        }
+        
+        // Restore sidebar state
+        const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (sidebarCollapsed) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+    },
+    
+    // Initialize Socket.IO connection
+    initializeSocket() {
+        if (this.socket) {
+            console.log('Socket already connected');
+            return;
+        }
+        
+        try {
+            // Initialize Socket.IO with proper configuration
+            this.socket = io(Config.SOCKET_URL, {
+                transports: ['websocket', 'polling'],
+                upgrade: true,
+                rememberUpgrade: true,
+                timeout: 10000,
+                forceNew: false
+            });
+            
+            // Connection event handlers
+            this.socket.on('connect', () => {
+                console.log('Socket connected');
+                
+                // Join user room for notifications
+                if (this.currentUser) {
+                    this.socket.emit('join', {
+                        userId: this.currentUser.id,
+                        role: this.currentUser.role
+                    });
+                }
+            });
+            
+            this.socket.on('disconnect', (reason) => {
+                console.log('Socket disconnected:', reason);
+                if (reason === 'io server disconnect') {
+                    // Server disconnected, try to reconnect
+                    this.socket.connect();
+                }
+            });
+            
+            this.socket.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+            });
+            
+            // Application-specific event handlers
+            this.socket.on('notification', (data) => this.handleNotification(data));
+            this.socket.on('project_update', (data) => this.handleProjectUpdate(data));
+            this.socket.on('bid_update', (data) => this.handleBidUpdate(data));
+            this.socket.on('user_update', (data) => this.handleUserUpdate(data));
+            
+        } catch (error) {
+            console.error('Socket initialization error:', error);
+        }
+    },
+    
+    // Handle successful login
+    async handleLogin(username, password, remember = false) {
+        try {
+            this.showLoading(true);
+            
+            // Attempt login
+            const result = await Auth.login(username, password, remember);
+            
+            if (result.success) {
+                console.log('Login successful');
+                
+                // Initialize the main application
+                await this.initializeApp();
+                
+                return { success: true };
+            } else {
+                this.showError(result.message || 'Login failed');
+                return { success: false, message: result.message };
+            }
+            
+        } catch (error) {
+            console.error('Login error:', error);
+            this.showError(error.message || 'Login failed');
+            return { success: false, message: error.message };
+        } finally {
+            this.showLoading(false);
+        }
     },
     
     // Show login page
     showLoginPage() {
-        console.log('Showing login page');
-        
-        // Hide loading
-        this.showLoading(false);
-        
         // Hide main app elements
         DOM.hide('mainNav');
         DOM.hide('sidebar');
@@ -138,348 +287,77 @@ const App = {
         // Show login page
         DOM.show('loginPage');
         
-        // Initialize login form
+        // Clear any error states
+        this.clearMessages();
+        
+        // Focus on username field
+        const usernameField = DOM.get('loginUsername');
+        if (usernameField) {
+            setTimeout(() => usernameField.focus(), 100);
+        }
+        
+        // Initialize login form if not already done
         this.initializeLoginForm();
         
-        // Check for remembered username
-        const rememberedUsername = localStorage.getItem('rememberedUsername');
-        if (rememberedUsername) {
-            DOM.setValue('loginUsername', rememberedUsername);
-            DOM.get('rememberMe').checked = true;
-        }
+        // Check for remembered credentials
+        this.checkRememberedCredentials();
+        
+        console.log('Showing login page');
     },
     
     // Initialize login form
     initializeLoginForm() {
-        const form = DOM.get('loginForm');
-        if (!form) return;
-        
-        // Check if already initialized
-        if (form.dataset.initialized === 'true') {
+        const loginForm = DOM.get('loginForm');
+        if (!loginForm || loginForm.dataset.initialized === 'true') {
             return;
         }
         
-        // Mark as initialized
-        form.dataset.initialized = 'true';
-        
-        // Add submit handler
-        form.addEventListener('submit', async (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await this.handleLogin();
-        });
-        
-        // Add password toggle
-        const toggleBtn = form.querySelector('.toggle-password');
-        if (toggleBtn && !toggleBtn.dataset.initialized) {
-            toggleBtn.dataset.initialized = 'true';
-            toggleBtn.addEventListener('click', () => {
-                const input = DOM.get('loginPassword');
-                const icon = toggleBtn.querySelector('i');
-                
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.classList.replace('fa-eye', 'fa-eye-slash');
-                } else {
-                    input.type = 'password';
-                    icon.classList.replace('fa-eye-slash', 'fa-eye');
-                }
-            });
-        }
-    },
-    
-    // Handle login
-    async handleLogin() {
-        const username = DOM.getValue('loginUsername');
-        const password = DOM.getValue('loginPassword');
-        const remember = DOM.get('rememberMe').checked;
-        
-        if (!username || !password) {
-            this.showError('Please enter username and password');
-            return;
-        }
-        
-        try {
-            // Show loading on button
-            const submitBtn = DOM.query('#loginForm button[type="submit"]');
-            submitBtn.classList.add('loading');
-            submitBtn.disabled = true;
             
-            // Hide any previous errors
-            DOM.hide('loginError');
+            const username = DOM.getValue('loginUsername');
+            const password = DOM.getValue('loginPassword');
+            const remember = DOM.isChecked('rememberMe');
             
-            console.log('Attempting login for:', username);
-            
-            // Attempt login
-            const result = await Auth.login(username, password, remember);
-            
-            if (result.success) {
-                console.log('Login successful');
-                
-                // Handle remember me
-                if (remember) {
-                    localStorage.setItem('rememberedUsername', username);
-                } else {
-                    localStorage.removeItem('rememberedUsername');
-                }
-                
-                // Initialize the main application
-                await this.initializeApp();
-                
-            } else {
-                console.log('Login failed:', result.message);
-                DOM.setText('loginError', result.message || 'Invalid username or password');
-                DOM.show('loginError');
-                
-                // Remove loading state
-                submitBtn.classList.remove('loading');
-                submitBtn.disabled = false;
-            }
-            
-        } catch (error) {
-            console.error('Login error:', error);
-            DOM.setText('loginError', 'Login failed. Please try again.');
-            DOM.show('loginError');
-            
-            // Remove loading state
-            const submitBtn = DOM.query('#loginForm button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.classList.remove('loading');
-                submitBtn.disabled = false;
-            }
-        }
-    },
-    
-    // Initialize components
-    initializeComponents() {
-        console.log('Initializing UI components...');
-        
-        // Initialize notification bell
-        this.initializeNotifications();
-        
-        // Initialize user menu
-        this.initializeUserMenu();
-        
-        // Initialize sidebar
-        this.initializeSidebar();
-    },
-    
-    // Setup event listeners
-    setupEventListeners() {
-        // Logout button
-        const logoutBtn = DOM.get('logoutBtn');
-        if (logoutBtn && !logoutBtn.dataset.initialized) {
-            logoutBtn.dataset.initialized = 'true';
-            logoutBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                await this.logout();
-            });
-        }
-        
-        // Window resize
-        window.addEventListener('resize', () => {
-            this.handleResize();
-        }, { passive: true });
-    },
-    
-    // Initialize Socket.IO with better error handling
-    initializeSocket() {
-        // Check if Socket.IO is available
-        if (typeof io === 'undefined') {
-            console.warn('Socket.IO library not available, skipping socket initialization');
-            return;
-        }
-        
-        try {
-            // Get the token
-            const token = Auth.getToken();
-            if (!token) {
-                console.warn('No auth token available for socket connection');
+            if (!username || !password) {
+                this.showError('Please enter both username and password');
                 return;
             }
             
-            // Configure socket connection with proper URL
-            const socketUrl = window.location.origin; // Use same origin as the page
-            
-            this.socket = io(socketUrl, {
-                auth: {
-                    token: token
-                },
-                transports: ['websocket', 'polling'], // Try websocket first, fall back to polling
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionDelayMax: 5000,
-                reconnectionAttempts: 5
-            });
-            
-            // Socket event handlers
-            this.socket.on('connect', () => {
-                console.log('Socket connected');
-                const statusEl = DOM.get('connectionStatus');
-                if (statusEl) {
-                    statusEl.classList.add('online');
-                    statusEl.classList.remove('offline');
-                }
-                DOM.setText('connectionText', 'Connected');
-            });
-            
-            this.socket.on('disconnect', () => {
-                console.log('Socket disconnected');
-                const statusEl = DOM.get('connectionStatus');
-                if (statusEl) {
-                    statusEl.classList.remove('online');
-                    statusEl.classList.add('offline');
-                }
-                DOM.setText('connectionText', 'Disconnected');
-            });
-            
-            this.socket.on('connect_error', (error) => {
-                console.warn('Socket connection error:', error.message);
-                // Don't show error to user unless it's critical
-                if (error.type === 'TransportError') {
-                    console.log('Socket transport error, will retry...');
-                }
-            });
-            
-            this.socket.on('notification', (data) => {
-                this.handleNotification(data);
-            });
-            
-            // Store socket reference if State is available
-            if (typeof State !== 'undefined' && State.setSocket) {
-                State.setSocket(this.socket);
-            }
-            
-        } catch (error) {
-            console.error('Socket initialization error:', error);
-            // Don't fail the entire app initialization if socket fails
-            console.warn('Application will continue without real-time updates');
-        }
-    },
-    
-    // Initialize notifications
-    initializeNotifications() {
-        const bell = DOM.get('notificationBell');
-        const dropdown = DOM.get('notificationDropdown');
-        
-        if (bell && dropdown && !bell.dataset.initialized) {
-            bell.dataset.initialized = 'true';
-            
-            bell.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('active');
-            });
-            
-            // Close on outside click
-            document.addEventListener('click', () => {
-                dropdown.classList.remove('active');
-            });
-            
-            dropdown.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-        
-        // Mark all as read
-        const markAllBtn = DOM.get('markAllRead');
-        if (markAllBtn && !markAllBtn.dataset.initialized) {
-            markAllBtn.dataset.initialized = 'true';
-            markAllBtn.addEventListener('click', () => {
-                if (typeof NotificationsComponent !== 'undefined') {
-                    NotificationsComponent.markAllAsRead();
-                }
-            });
-        }
-    },
-    
-    // Initialize user menu
-    initializeUserMenu() {
-        const trigger = DOM.get('userMenuTrigger');
-        const dropdown = DOM.get('userDropdown');
-        
-        if (trigger && dropdown && !trigger.dataset.initialized) {
-            trigger.dataset.initialized = 'true';
-            
-            trigger.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dropdown.classList.toggle('active');
-            });
-            
-            // Close on outside click
-            document.addEventListener('click', () => {
-                dropdown.classList.remove('active');
-            });
-            
-            dropdown.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-    },
-    
-    // Initialize sidebar
-    initializeSidebar() {
-        // Add active class to current route
-        const currentHash = window.location.hash || '#/dashboard';
-        const currentRoute = currentHash.substring(1); // Remove #
-        
-        document.querySelectorAll('.menu-link').forEach(link => {
-            // Check if already initialized
-            if (link.dataset.initialized) return;
-            link.dataset.initialized = 'true';
-            
-            const route = link.getAttribute('data-route');
-            if (route && currentRoute.includes(route)) {
-                link.classList.add('active');
-            }
-            
-            // Add click handler
-            link.addEventListener('click', (e) => {
-                // Remove active from all
-                document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
-                // Add active to clicked
-                link.classList.add('active');
-            });
+            await this.handleLogin(username, password, remember);
         });
         
-        // Sidebar toggle functionality if needed
-        const toggleBtn = DOM.query('.sidebar-toggle');
-        if (toggleBtn && !toggleBtn.dataset.initialized) {
-            toggleBtn.dataset.initialized = 'true';
-            toggleBtn.addEventListener('click', () => {
-                document.body.classList.toggle('sidebar-collapsed');
-                localStorage.setItem('sidebarCollapsed', document.body.classList.contains('sidebar-collapsed'));
-            });
-        }
+        loginForm.dataset.initialized = 'true';
+    },
+    
+    // Check for remembered credentials
+    checkRememberedCredentials() {
+        const rememberMe = localStorage.getItem('rememberMe') === 'true';
+        const rememberedUsername = localStorage.getItem('rememberedUsername');
         
-        // Restore sidebar state
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
-            document.body.classList.add('sidebar-collapsed');
+        if (rememberMe && rememberedUsername) {
+            DOM.setValue('loginUsername', rememberedUsername);
+            DOM.setChecked('rememberMe', true);
         }
     },
     
-    // Update UI for user role
+    // Update navigation with user info
+    updateNavigation() {
+    const user = this.currentUser;
+    if (!user) return;
+    
+    // Update user name in simplified navigation
+    DOM.setText('userNameDisplay', user.name || 'User');
+    
+    // Log the user info for debugging
+    console.log('Updated navigation for user:', user.name, 'Role:', user.role);
+    },
+    
+    // Update UI based on user role
     updateUIForRole(role) {
         console.log('Updating UI for role:', role);
         
-        // Remove all role classes
-        document.body.classList.remove('admin-mode', 'pm-mode', 'installer-mode', 'ops-mode');
-        
-        // Add role-specific class
-        switch(role) {
-            case 'admin':
-                document.body.classList.add('admin-mode');
-                break;
-            case 'project_manager':
-                document.body.classList.add('pm-mode');
-                break;
-            case 'installation_company':
-                document.body.classList.add('installer-mode');
-                break;
-            case 'operations':
-                document.body.classList.add('ops-mode');
-                break;
-        }
-        
-        // Show/hide role-specific elements
+        // Show/hide elements based on role
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = role === 'admin' ? '' : 'none';
         });
@@ -520,6 +398,62 @@ const App = {
         // Add to notification list if component is available
         if (typeof NotificationsComponent !== 'undefined') {
             NotificationsComponent.addNotification(data);
+        }
+    },
+    
+    // Handle project updates
+    handleProjectUpdate(data) {
+        console.log('Project update received:', data);
+        
+        // Refresh projects component if visible
+        if (typeof ProjectsComponent !== 'undefined' && 
+            this.currentRoute && this.currentRoute.includes('/projects')) {
+            ProjectsComponent.handleUpdate(data);
+        }
+        
+        // Update dashboard if visible
+        if (typeof DashboardComponent !== 'undefined' && 
+            this.currentRoute === '/dashboard') {
+            DashboardComponent.handleProjectUpdate(data);
+        }
+    },
+    
+    // Handle bid updates
+    handleBidUpdate(data) {
+        console.log('Bid update received:', data);
+        
+        // Refresh bids component if visible
+        if (typeof BidsComponent !== 'undefined' && 
+            this.currentRoute && this.currentRoute.includes('/bids')) {
+            BidsComponent.handleUpdate(data);
+        }
+        
+        // Update dashboard if visible
+        if (typeof DashboardComponent !== 'undefined' && 
+            this.currentRoute === '/dashboard') {
+            DashboardComponent.handleBidUpdate(data);
+        }
+    },
+    
+    // Handle user updates
+    handleUserUpdate(data) {
+        console.log('User update received:', data);
+        
+        // If it's an update for the current user, refresh user data
+        if (data.userId === this.currentUser?.id) {
+            Auth.getCurrentUser().then(user => {
+                if (user) {
+                    this.currentUser = user;
+                    State.setUser(user);
+                    this.updateNavigation();
+                }
+            });
+        }
+        
+        // Refresh users component if visible
+        if (typeof UsersComponent !== 'undefined' && 
+            this.currentRoute && this.currentRoute.includes('/users')) {
+            UsersComponent.handleUpdate(data);
         }
     },
     
@@ -570,81 +504,52 @@ const App = {
         }
     },
     
-    // Show toast notification
-    showToast(title, message, type = 'info') {
-        const container = DOM.get('toastContainer');
-        if (!container) return;
-        
-        const toastId = `toast-${Date.now()}`;
-        const toast = DOM.create('div', {
-            id: toastId,
-            className: `toast toast-${type} animate__animated animate__fadeInRight`
-        });
-        
-        toast.innerHTML = `
-            <div class="toast-header">
-                <strong>${title}</strong>
-                <button class="btn-icon toast-close" onclick="App.removeToast('${toastId}')">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="toast-body">${message}</div>
-        `;
-        
-        container.appendChild(toast);
-        
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            this.removeToast(toastId);
-        }, 5000);
-    },
-    
-    // Remove toast
-    removeToast(toastId) {
-        const toast = DOM.get(toastId);
-        if (toast) {
-            toast.classList.add('animate__fadeOutRight');
-            setTimeout(() => {
-                toast.remove();
-            }, 500);
+    // Show error message
+    showError(message) {
+        console.error('Error:', message);
+        if (typeof Toast !== 'undefined') {
+            Toast.show(message, 'error');
+        } else {
+            alert('Error: ' + message);
         }
     },
     
     // Show success message
     showSuccess(message) {
-        this.showToast('Success', message, 'success');
+        console.log('Success:', message);
+        if (typeof Toast !== 'undefined') {
+            Toast.show(message, 'success');
+        }
     },
     
-    // Show error message
-    showError(message) {
-        this.showToast('Error', message, 'danger');
+    // Show toast notification
+    showToast(title, message, type = 'info') {
+        if (typeof Toast !== 'undefined') {
+            Toast.show(`${title}: ${message}`, type);
+        }
     },
     
-    // Show warning message
-    showWarning(message) {
-        this.showToast('Warning', message, 'warning');
-    },
-    
-    // Show info message
-    showInfo(message) {
-        this.showToast('Information', message, 'info');
+    // Clear all messages
+    clearMessages() {
+        // Clear any existing error/success messages
+        const errorAlerts = document.querySelectorAll('.alert-danger');
+        const successAlerts = document.querySelectorAll('.alert-success');
+        
+        [...errorAlerts, ...successAlerts].forEach(alert => {
+            alert.remove();
+        });
     }
 };
 
-// Make App globally available
-window.App = App;
+// Initialize app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+});
 
-// Only initialize once when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // Small delay to ensure all scripts are loaded
-        setTimeout(() => {
-            App.init();
-        }, 100);
-    });
-} else {
-    // DOM is already loaded, but still add small delay for other scripts
-    setTimeout(() => {
-        App.init();
-    }, 100);
-}
+// Handle page visibility changes (for socket reconnection)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && App.initialized && App.socket && !App.socket.connected) {
+        console.log('Page became visible, reconnecting socket...');
+        App.socket.connect();
+    }
+});

@@ -47,18 +47,7 @@ const ProfileComponent = {
                     <!-- Profile Sidebar -->
                     <div class="col-lg-4">
                         <div class="card">
-                            <div class="card-body text-center">
-                                <div class="profile-avatar-container">
-                                    <img src="${user.avatar || '/images/default-avatar.png'}" 
-                                         class="profile-avatar" 
-                                         alt="${user.name}"
-                                         id="profileAvatar">
-                                    <button class="btn btn-sm btn-primary avatar-upload-btn" 
-                                            onclick="ProfileComponent.changeAvatar()">
-                                        <i class="fas fa-camera"></i>
-                                    </button>
-                                </div>
-                                
+                            <div class="card-body text-center">                                
                                 <h3 class="mt-3">${user.name}</h3>
                                 <p class="text-muted">${user.email}</p>
                                 
@@ -96,10 +85,6 @@ const ProfileComponent = {
                                 <button class="btn btn-outline btn-block mb-2" 
                                         onclick="ProfileComponent.showNotificationSettings()">
                                     <i class="fas fa-bell"></i> Notification Settings
-                                </button>
-                                <button class="btn btn-outline btn-block" 
-                                        onclick="ProfileComponent.downloadData()">
-                                    <i class="fas fa-download"></i> Download My Data
                                 </button>
                             </div>
                         </div>

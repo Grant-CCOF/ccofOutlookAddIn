@@ -123,6 +123,95 @@ class ProjectModel {
         `;
         return db.run(sql, [bidId, amount, projectId]);
     }
+
+    static async getCountByManager(managerId) {
+        const sql = `SELECT COUNT(*) as count FROM projects WHERE project_manager_id = ?`;
+        try {
+            const result = await db.get(sql, [managerId]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting project count by manager:', error);
+            return 0;
+        }
+    }
+
+    static async getCountByManagerAndStatus(managerId, status) {
+        const sql = `
+            SELECT COUNT(*) as count 
+            FROM projects 
+            WHERE project_manager_id = ? AND status = ?
+        `;
+        try {
+            const result = await db.get(sql, [managerId, status]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting project count by manager and status:', error);
+            return 0;
+        }
+    }
+
+    static async getCompletionRate(managerId) {
+        const sql = `
+            SELECT 
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) * 100.0 / 
+                NULLIF(COUNT(*), 0) as rate
+            FROM projects 
+            WHERE project_manager_id = ?
+        `;
+        try {
+            const result = await db.get(sql, [managerId]);
+            return result ? (result.rate || 0) : 0;
+        } catch (error) {
+            logger.error('Error getting completion rate:', error);
+            return 0;
+        }
+    }
+
+    static async getCountByPeriod(days) {
+        const sql = `
+            SELECT COUNT(*) as count 
+            FROM projects 
+            WHERE created_at >= datetime('now', '-' || ? || ' days')
+        `;
+        try {
+            const result = await db.get(sql, [days]);
+            return result ? result.count : 0;
+        } catch (error) {
+            logger.error('Error getting project count by period:', error);
+            return 0;
+        }
+    }
+
+    static async getRecent(limit = 5) {
+        const sql = `
+            SELECT p.*, u.name as project_manager_name 
+            FROM projects p
+            LEFT JOIN users u ON p.project_manager_id = u.id
+            ORDER BY p.created_at DESC 
+            LIMIT ?
+        `;
+        try {
+            return await db.all(sql, [limit]);
+        } catch (error) {
+            logger.error('Error getting recent projects:', error);
+            return [];
+        }
+    }
+
+    static async getRecentByManager(managerId, limit = 5) {
+        const sql = `
+            SELECT * FROM projects 
+            WHERE project_manager_id = ?
+            ORDER BY created_at DESC 
+            LIMIT ?
+        `;
+        try {
+            return await db.all(sql, [managerId, limit]);
+        } catch (error) {
+            logger.error('Error getting recent projects by manager:', error);
+            return [];
+        }
+    }
     
     static async delete(id) {
         const sql = `DELETE FROM projects WHERE id = ?`;
