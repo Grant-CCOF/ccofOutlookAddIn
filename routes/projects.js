@@ -36,7 +36,11 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get single project
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', [
+    authenticateToken,
+    param('id').isInt().withMessage('Valid project ID required'),
+    handleValidationErrors
+], async (req, res) => {
     try {
         const project = await ProjectModel.getById(req.params.id);
         
@@ -44,18 +48,34 @@ router.get('/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Project not found' });
         }
         
-        // Check access rights
-        if (req.user.role === 'project_manager' && project.project_manager_id !== req.user.id) {
-            return res.status(403).json({ error: 'Access denied' });
+        // Get project manager details
+        if (project.project_manager_id) {
+            const manager = await UserModel.getById(project.project_manager_id);
+            project.project_manager_name = manager ? manager.name : 'Unknown';
         }
         
-        // Get bids if user has access
-        if (req.user.role === 'admin' || project.project_manager_id === req.user.id) {
-            project.bids = await BidModel.getProjectBids(project.id);
+        // SECURITY: Control bid count visibility
+        if (req.user.role === 'installation_company') {
+            // For installation companies, only show if they have bid
+            const userBid = await BidModel.getUserBidForProject(req.user.id, project.id);
+            project.has_bid = !!userBid;
+            project.user_bid_status = userBid ? userBid.status : null;
+            
+            // Don't reveal total bid count or other bid details
+            delete project.bid_count;
+            delete project.lowest_bid;
+            delete project.highest_bid;
+            delete project.average_bid;
+        } else if (req.user.role === 'project_manager' || req.user.role === 'admin') {
+            // Project managers and admins can see bid statistics
+            const bidStats = await BidModel.getProjectBidStats(project.id);
+            project.bid_count = bidStats.count;
+            project.lowest_bid = bidStats.min_amount;
+            project.highest_bid = bidStats.max_amount;
+            project.average_bid = bidStats.avg_amount;
         }
         
-        // Get files
-        project.files = await FileModel.getByProject(project.id);
+        logger.info(`Project details retrieved: ${project.id} by ${req.user.username}`);
         
         res.json(project);
     } catch (error) {

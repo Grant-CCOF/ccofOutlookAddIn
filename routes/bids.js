@@ -25,14 +25,38 @@ router.get('/', [
 });
 
 // Get user's bids
-router.get('/my-bids', authenticateToken, async (req, res) => {
+router.get('/my-bids', [
+    authenticateToken
+], async (req, res) => {
     try {
-        if (!['installation_company', 'operations'].includes(req.user.role)) {
-            return res.status(403).json({ error: 'Only installation companies can view bids' });
-        }
+        const { page = 1, limit = 10, status, project_id } = req.query;
         
-        const bids = await BidModel.getUserBids(req.user.id);
-        res.json(bids);
+        // Only get bids for the current user
+        const bids = await BidModel.getUserBids(req.user.id, {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            status,
+            project_id
+        });
+        
+        // For each bid, only include limited project information
+        const bidsWithProjectInfo = await Promise.all(bids.map(async (bid) => {
+            const project = await ProjectModel.getById(bid.project_id);
+            return {
+                ...bid,
+                project_title: project.title,
+                project_status: project.status,
+                project_zip: project.zip_code,
+                // Don't include other bidders' information
+                total_bids: null, // Hide total number of competing bids
+                lowest_bid: null, // Hide lowest bid amount
+                highest_bid: null // Hide highest bid amount
+            };
+        }));
+        
+        logger.info(`User bids retrieved for ${req.user.username}`);
+        
+        res.json(bidsWithProjectInfo);
     } catch (error) {
         logger.error('Error fetching user bids:', error);
         res.status(500).json({ error: 'Failed to fetch bids' });
@@ -52,18 +76,39 @@ router.get('/project/:projectId', [
             return res.status(404).json({ error: 'Project not found' });
         }
         
-        // Check access rights
-        if (req.user.role === 'project_manager' && project.project_manager_id !== req.user.id) {
+        // SECURITY CHECK: Only admins and project managers can see all bids
+        const userRole = req.user.role;
+        const userId = req.user.id;
+        
+        if (userRole === 'installation_company') {
+            // Installation companies can only see their own bid
+            const userBid = await BidModel.getUserBidForProject(userId, req.params.projectId);
+            
+            // Return only their own bid in an array format for consistency
+            // but without revealing other bidders
+            return res.json(userBid ? [{
+                id: userBid.id,
+                amount: userBid.amount,
+                delivery_date: userBid.delivery_date,
+                status: userBid.status,
+                created_at: userBid.created_at,
+                // Don't include other bidder information
+                user_id: userBid.user_id,
+                user_name: 'Your Bid',
+                company: userBid.company
+            }] : []);
+        }
+        
+        // For project managers, only show bids for their projects
+        if (userRole === 'project_manager' && project.project_manager_id !== userId) {
             return res.status(403).json({ error: 'Access denied' });
         }
         
-        if (req.user.role === 'installation_company' || req.user.role === 'operations') {
-            // Installation companies can only see their own bid
-            const userBid = await BidModel.getUserBidForProject(req.user.id, project.id);
-            return res.json(userBid ? [userBid] : []);
-        }
-        
+        // Admins and authorized project managers can see all bids
         const bids = await BidModel.getProjectBids(req.params.projectId);
+        
+        logger.info(`Bids retrieved for project ${req.params.projectId} by ${req.user.username}`);
+        
         res.json(bids);
     } catch (error) {
         logger.error('Error fetching project bids:', error);

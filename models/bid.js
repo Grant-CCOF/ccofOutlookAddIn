@@ -25,6 +25,20 @@ class BidModel {
             throw error;
         }
     }
+
+    // Get a specific user's bid for a project
+    static async getUserBidForProject(userId, projectId) {
+        const query = `
+            SELECT b.*, u.name as user_name, u.company_name as company
+            FROM bids b
+            JOIN users u ON b.user_id = u.id
+            WHERE b.user_id = ? AND b.project_id = ?
+            LIMIT 1
+        `;
+        
+        const [rows] = await db.query(query, [userId, projectId]);
+        return rows[0] || null;
+    }
     
     static async getById(id) {
         const sql = `

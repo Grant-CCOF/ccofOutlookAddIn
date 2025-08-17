@@ -401,6 +401,18 @@ const ProjectsComponent = {
             
             const project = await API.projects.getById(projectId);
             this.state.selectedProject = project;
+            // Load bids only if user has permission
+            if (this.shouldShowBidsTab()) {
+                try {
+                    project.bids = await API.bids.getProjectBids(projectId);
+                } catch (error) {
+                    console.error('Failed to load bids:', error);
+                    project.bids = [];
+                }
+            } else {
+                // Explicitly don't load bids for installation companies
+                project.bids = null;
+            }
             
             const content = this.renderProjectDetail(project);
             DOM.setHTML('pageContent', content);
@@ -468,13 +480,15 @@ const ProjectsComponent = {
                                 <span>Details</span>
                             </button>
                         </li>
-                        <li class="apple-tab-item">
-                            <button class="apple-tab-link" data-tab="bids">
-                                <i class="fas fa-gavel tab-icon"></i>
-                                <span>Bids</span>
-                                <span class="apple-tab-badge">${project.bids?.length || 0}</span>
-                            </button>
-                        </li>
+                        ${this.shouldShowBidsTab() ? `
+                            <li class="apple-tab-item">
+                                <button class="apple-tab-link" data-tab="bids">
+                                    <i class="fas fa-gavel tab-icon"></i>
+                                    <span>Bids</span>
+                                    <span class="apple-tab-badge">${project.bids?.length || 0}</span>
+                                </button>
+                            </li>
+                        ` : ''}
                         <li class="apple-tab-item">
                             <button class="apple-tab-link" data-tab="files">
                                 <i class="fas fa-folder tab-icon"></i>
@@ -491,9 +505,11 @@ const ProjectsComponent = {
                         ${this.renderProjectDetailsTab(project)}
                     </div>
                     
-                    <div class="apple-tab-pane" data-tab-content="bids">
-                        ${this.renderProjectBidsTab(project)}
-                    </div>
+                    ${this.shouldShowBidsTab() ? `
+                        <div class="apple-tab-pane" data-tab-content="bids">
+                            ${this.renderProjectBidsTab(project)}
+                        </div>
+                    ` : ''}
                     
                     <div class="apple-tab-pane" data-tab-content="files">
                         ${this.renderProjectFilesTab(project)}
@@ -621,13 +637,241 @@ const ProjectsComponent = {
     },
     
     renderProjectBidsTab(project) {
-        // Implementation for bids tab
-        return '<div>Bids content...</div>';
+        // Check if project has bids
+        if (!project.bids || project.bids.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="fas fa-gavel" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
+                    <h4>No Bids Yet</h4>
+                    <p class="text-muted">No bids have been submitted for this project.</p>
+                    ${project.status === 'bidding' ? `
+                        <p class="text-muted">
+                            <i class="fas fa-clock"></i> 
+                            Bidding closes on ${new Date(project.bid_due_date).toLocaleDateString()}
+                        </p>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        const userRole = State.getUserRole();
+        const canAcceptBids = (userRole === 'admin' || 
+                              (userRole === 'project_manager' && project.project_manager_id === State.getUserId())) 
+                              && project.status === 'reviewing';
+
+        return `
+            <div class="bids-list-container">
+                ${project.status === 'bidding' ? `
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle"></i>
+                        Bidding is open until ${new Date(project.bid_due_date).toLocaleDateString()}
+                    </div>
+                ` : ''}
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Bidder</th>
+                                <th>Company</th>
+                                <th>Rating</th>
+                                <th>Bid Amount</th>
+                                <th>Delivery Date</th>
+                                <th>Submitted</th>
+                                <th>Status</th>
+                                ${canAcceptBids ? '<th>Action</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${project.bids.map(bid => this.renderBidRow(bid, project, canAcceptBids)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    },
+
+    renderBidRow(bid, project, canAcceptBids) {
+        // Determine bid status
+        let statusBadge = '';
+        if (project.awarded_to === bid.user_id) {
+            statusBadge = '<span class="badge badge-success">Won</span>';
+        } else if (project.status === 'awarded' || project.status === 'completed') {
+            statusBadge = '<span class="badge badge-secondary">Lost</span>';
+        } else if (project.status === 'reviewing') {
+            statusBadge = '<span class="badge badge-warning">Under Review</span>';
+        } else {
+            statusBadge = '<span class="badge badge-info">Pending</span>';
+        }
+
+        // Get company rating (would come from bid.company_rating in real implementation)
+        const rating = bid.company_rating || bid.user_rating || 0;
+        const ratingStars = this.getRatingStars(rating);
+
+        return `
+            <tr class="bid-row" data-bid-id="${bid.id}">
+                <td>
+                    <div class="d-flex align-items-center">
+                        <img src="${bid.user_avatar || '/images/default-avatar.png'}" 
+                             class="rounded-circle mr-2" 
+                             style="width: 32px; height: 32px; object-fit: cover;"
+                             alt="${bid.user_name}">
+                        <span>${bid.user_name}</span>
+                    </div>
+                </td>
+                <td>${bid.company || '-'}</td>
+                <td>
+                    <div class="rating-display">
+                        ${ratingStars}
+                        <small class="text-muted ml-1">(${rating.toFixed(1)})</small>
+                    </div>
+                </td>
+                <td class="font-weight-bold text-primary">
+                    ${Formatter.currency(bid.amount)}
+                </td>
+                <td>${new Date(bid.delivery_date).toLocaleDateString()}</td>
+                <td>
+                    <small class="text-muted">
+                        ${Formatter.timeAgo(bid.created_at)}
+                    </small>
+                </td>
+                <td>${statusBadge}</td>
+                ${canAcceptBids ? `
+                    <td>
+                        <button class="btn btn-sm btn-success" 
+                                onclick="ProjectsComponent.acceptBid(${project.id}, ${bid.id})"
+                                title="Accept this bid">
+                            <i class="fas fa-check"></i> Accept
+                        </button>
+                    </td>
+                ` : ''}
+            </tr>
+        `;
+    },
+
+    getRatingStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+        
+        let stars = '';
+        for (let i = 0; i < fullStars; i++) {
+            stars += '<i class="fas fa-star text-warning"></i>';
+        }
+        if (hasHalfStar) {
+            stars += '<i class="fas fa-star-half-alt text-warning"></i>';
+        }
+        for (let i = 0; i < emptyStars; i++) {
+            stars += '<i class="far fa-star text-warning"></i>';
+        }
+        
+        return stars;
     },
     
     renderProjectFilesTab(project) {
-        // Implementation for files tab
-        return '<div>Files content...</div>';
+        // Check if project has files
+        if (!project.files || project.files.length === 0) {
+            return `
+                <div class="empty-state">
+                    <i class="fas fa-folder-open" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
+                    <h4>No Files Uploaded</h4>
+                    <p class="text-muted">No files have been uploaded for this project yet.</p>
+                    ${(State.getUserRole() === 'admin' || 
+                       (State.getUserRole() === 'project_manager' && project.project_manager_id === State.getUserId())) ? `
+                        <button class="btn btn-primary mt-3" onclick="ProjectsComponent.showUploadFileModal(${project.id})">
+                            <i class="fas fa-upload"></i> Upload Files
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        return `
+            <div class="files-container">
+                ${(State.getUserRole() === 'admin' || 
+                   (State.getUserRole() === 'project_manager' && project.project_manager_id === State.getUserId())) ? `
+                    <div class="mb-3">
+                        <button class="btn btn-primary" onclick="ProjectsComponent.showUploadFileModal(${project.id})">
+                            <i class="fas fa-upload"></i> Upload Files
+                        </button>
+                    </div>
+                ` : ''}
+                
+                <div class="files-list">
+                    ${project.files.map(file => this.renderFileItem(file)).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    renderFileItem(file) {
+        const fileIcon = this.getFileIcon(file.name || file.original_name);
+        const fileName = file.original_name || file.name;
+        const fileSize = this.formatFileSize(file.size);
+        
+        return `
+            <div class="file-item card mb-2">
+                <div class="card-body d-flex align-items-center">
+                    <div class="file-icon mr-3">
+                        <i class="fas ${fileIcon} fa-2x text-muted"></i>
+                    </div>
+                    <div class="file-info flex-grow-1">
+                        <h6 class="mb-1">${fileName}</h6>
+                        <small class="text-muted">
+                            ${fileSize} • Uploaded ${Formatter.timeAgo(file.created_at)}
+                            ${file.uploaded_by_name ? ` by ${file.uploaded_by_name}` : ''}
+                        </small>
+                    </div>
+                    <div class="file-actions">
+                        <a href="${API.files.download(file.id)}" 
+                           class="btn btn-sm btn-outline-primary"
+                           target="_blank"
+                           download="${fileName}">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const iconMap = {
+            'pdf': 'fa-file-pdf',
+            'doc': 'fa-file-word',
+            'docx': 'fa-file-word',
+            'xls': 'fa-file-excel',
+            'xlsx': 'fa-file-excel',
+            'ppt': 'fa-file-powerpoint',
+            'pptx': 'fa-file-powerpoint',
+            'jpg': 'fa-file-image',
+            'jpeg': 'fa-file-image',
+            'png': 'fa-file-image',
+            'gif': 'fa-file-image',
+            'zip': 'fa-file-archive',
+            'rar': 'fa-file-archive',
+            'txt': 'fa-file-alt',
+            'csv': 'fa-file-csv'
+        };
+        
+        return iconMap[ext] || 'fa-file';
+    },
+
+    shouldShowBidsTab() {
+        const userRole = State.getUserRole();
+        // Only admins and project managers can see bids
+        return userRole === 'admin' || userRole === 'project_manager';
+    },
+
+    formatFileSize(bytes) {
+        if (!bytes) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
     
     // Initialize detail event listeners
@@ -643,6 +887,11 @@ const ProjectsComponent = {
     
     // Switch tab
     switchTab(tabName) {
+        // Check if trying to switch to bids tab without permission
+        if (tabName === 'bids' && !this.shouldShowBidsTab()) {
+            console.warn('Access denied to bids tab');
+            return;
+        }
         // Update tab links with smooth transition
         document.querySelectorAll('.apple-tab-link').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -802,6 +1051,110 @@ const ProjectsComponent = {
         } catch (error) {
             App.showError('Failed to complete project');
         }
+    },
+
+    // Accept a bid
+    async acceptBid(projectId, bidId) {
+        if (!confirm('Are you sure you want to accept this bid? This action cannot be undone.')) {
+            return;
+        }
+        
+        try {
+            App.showLoading(true);
+            await API.projects.award(projectId, { bidId });
+            App.showSuccess('Bid accepted successfully! The contractor has been notified.');
+            
+            // Reload the project details
+            await this.renderDetail(projectId);
+        } catch (error) {
+            Config.error('Failed to accept bid:', error);
+            App.showError(error.message || 'Failed to accept bid');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    // Show file upload modal
+    showUploadFileModal(projectId) {
+        const content = `
+            <form id="uploadFileForm">
+                <div class="form-group">
+                    <label>Select Files</label>
+                    <input type="file" 
+                        class="form-control-file" 
+                        id="projectFiles" 
+                        multiple 
+                        required>
+                    <small class="text-muted">
+                        You can select multiple files. Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, ZIP
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Description (Optional)</label>
+                    <textarea class="form-control" 
+                            id="fileDescription" 
+                            rows="3" 
+                            placeholder="Add a description for these files..."></textarea>
+                </div>
+                
+                <div id="selectedFilesList" class="mb-3"></div>
+            </form>
+        `;
+        
+        const modal = Modals.show('Upload Files', content, {
+            size: 'medium',
+            confirmText: 'Upload',
+            onConfirm: async () => {
+                const files = document.getElementById('projectFiles').files;
+                if (!files || files.length === 0) {
+                    App.showError('Please select at least one file');
+                    return false;
+                }
+                
+                try {
+                    App.showLoading(true);
+                    
+                    // Upload each file
+                    for (const file of files) {
+                        await API.files.upload(file, { 
+                            project_id: projectId,
+                            description: document.getElementById('fileDescription').value
+                        });
+                    }
+                    
+                    App.showSuccess(`${files.length} file(s) uploaded successfully`);
+                    await this.renderDetail(projectId);
+                    return true;
+                } catch (error) {
+                    App.showError(error.message || 'Failed to upload files');
+                    return false;
+                } finally {
+                    App.showLoading(false);
+                }
+            }
+        });
+        
+        // Show selected files preview
+        document.getElementById('projectFiles').addEventListener('change', (e) => {
+            const filesList = document.getElementById('selectedFilesList');
+            if (e.target.files.length > 0) {
+                filesList.innerHTML = `
+                    <h6>Selected Files:</h6>
+                    <ul class="list-unstyled">
+                        ${Array.from(e.target.files).map(file => `
+                            <li>
+                                <i class="fas fa-file mr-2"></i>
+                                ${file.name} 
+                                <small class="text-muted">(${this.formatFileSize(file.size)})</small>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+            } else {
+                filesList.innerHTML = '';
+            }
+        });
     },
 
     async adminResetProject(projectId) {

@@ -1938,3 +1938,146 @@ body.sidebar-collapsed .main-content {
         transform: translateY(0);
     }
 }
+
+/* Bids Tab Styles */
+.bids-list-container {
+    padding: 1rem;
+}
+
+.bid-row {
+    transition: background-color 0.2s ease;
+}
+
+.bid-row:hover {
+    background-color: #f8f9fa;
+}
+
+.rating-display {
+    display: flex;
+    align-items: center;
+}
+
+.rating-display i {
+    font-size: 0.875rem;
+    margin-right: 1px;
+}
+
+/* Files Tab Styles */
+.files-container {
+    padding: 1rem;
+}
+
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.file-item {
+    border: 1px solid #e0e0e0;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.file-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.file-icon {
+    color: #6c757d;
+}
+
+.file-info h6 {
+    margin: 0;
+    font-weight: 500;
+    color: #333;
+}
+
+.file-actions .btn {
+    min-width: 100px;
+}
+
+/* Empty State Styles */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state h4 {
+    color: #6c757d;
+    font-weight: 400;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: #adb5bd;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive Table */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .table td, .table th {
+        padding: 0.5rem;
+    }
+    
+    .file-item .card-body {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .file-icon {
+        margin-bottom: 0.5rem;
+    }
+    
+    .file-actions {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+    
+    .file-actions .btn {
+        width: 100%;
+    }
+}
+
+/* Badge Styles */
+.badge-info {
+    background-color: #17a2b8;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-success {
+    background-color: #28a745;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+}
+
+/* Upload Modal Styles */
+#selectedFilesList {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
+}
+
+#selectedFilesList ul {
+    margin-bottom: 0;
+}
+
+#selectedFilesList li {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+#selectedFilesList li:last-child {
+    border-bottom: none;
+}
