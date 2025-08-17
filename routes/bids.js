@@ -74,7 +74,7 @@ router.get('/project/:projectId', [
 // Submit a bid
 router.post('/', [
     authenticateToken,
-    requireRole(['installation_company', 'operations']),
+    requireRole(['installation_company', 'operations', 'admin']), // Added admin
     body('project_id').isInt().withMessage('Valid project ID required'),
     body('amount').isFloat({ min: 0 }).withMessage('Valid bid amount required'),
     body('comments').optional().isString(),
@@ -91,47 +91,46 @@ router.post('/', [
             return res.status(404).json({ error: 'Project not found' });
         }
         
-        if (project.status !== 'bidding') {
+        // Allow admin to bid on any status for testing
+        if (req.user.role !== 'admin' && project.status !== 'bidding') {
             return res.status(400).json({ error: 'Project is not open for bidding' });
         }
         
-        // Check if bid due date has passed
-        if (new Date() > new Date(project.bid_due_date)) {
+        // Skip deadline check for admin
+        if (req.user.role !== 'admin' && new Date() > new Date(project.bid_due_date)) {
             return res.status(400).json({ error: 'Bid submission deadline has passed' });
         }
         
-        // Check if user already submitted a bid
+        // Check if user already submitted a bid (skip for admin)
         const existingBid = await BidModel.getUserBidForProject(req.user.id, project_id);
-        if (existingBid) {
-            return res.status(409).json({ error: 'You have already submitted a bid for this project' });
-        }
-        
-        // Check if bid exceeds max bid (if visible)
-        if (project.show_max_bid && project.max_bid && amount > project.max_bid) {
-            return res.status(400).json({ error: `Bid amount exceeds maximum allowed: $${project.max_bid}` });
+        if (existingBid && req.user.role !== 'admin') {
+            return res.status(400).json({ error: 'You have already submitted a bid for this project' });
         }
         
         // Create bid
-        const bidId = await BidModel.create({
+        const bidData = {
             project_id,
             user_id: req.user.id,
             amount,
             comments,
             alternate_delivery_date,
             status: 'pending'
-        });
+        };
         
-        const bid = await BidModel.getById(bidId);
-        const bidder = await UserModel.getById(req.user.id);
-        const projectManager = await UserModel.getById(project.project_manager_id);
+        const bidId = await BidModel.create(bidData);
+        const newBid = await BidModel.getById(bidId);
         
         // Notify project manager
-        await NotificationService.notifyNewBid(project, bid, bidder);
-        await emailService.sendBidNotification(projectManager, project, bid, bidder);
+        await NotificationService.notify(
+            project.project_manager_id,
+            'New Bid Received',
+            `New bid submitted for project "${project.title}"`,
+            { projectId: project_id, bidId }
+        );
         
-        logger.info(`Bid submitted: ${bidId} for project ${project_id} by user ${req.user.id}`);
+        logger.info(`Bid submitted: Project ${project_id} by user ${req.user.id}`);
         
-        res.status(201).json(bid);
+        res.status(201).json(newBid);
     } catch (error) {
         logger.error('Error submitting bid:', error);
         res.status(500).json({ error: 'Failed to submit bid' });

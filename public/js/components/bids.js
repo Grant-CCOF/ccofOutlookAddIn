@@ -52,36 +52,8 @@ const BidsComponent = {
     getManagerLayout() {
         return `
             <div class="bids-container">
-                <!-- Stats Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="totalBidsCount">0</div>
-                            <div class="stat-label">Total Bids</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="pendingBidsCount">0</div>
-                            <div class="stat-label">Pending Review</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="averageBidAmount">$0</div>
-                            <div class="stat-label">Average Bid</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="projectsWithBids">0</div>
-                            <div class="stat-label">Projects with Bids</div>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Filters -->
-                <div class="filter-bar">
+                <div class="filter-bar mb-3">
                     <div class="filter-group">
                         <label class="filter-label">Project:</label>
                         <select id="projectFilter" class="form-control filter-select">
@@ -97,12 +69,6 @@ const BidsComponent = {
                             <option value="won">Won</option>
                             <option value="lost">Lost</option>
                         </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <button class="btn btn-outline" id="exportBids">
-                            <i class="fas fa-download"></i> Export
-                        </button>
                     </div>
                 </div>
                 
@@ -136,34 +102,6 @@ const BidsComponent = {
     getContractorLayout() {
         return `
             <div class="bids-container">
-                <!-- Stats Cards -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card">
-                            <div class="stat-value" id="myTotalBids">0</div>
-                            <div class="stat-label">My Total Bids</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card success">
-                            <div class="stat-value" id="wonBids">0</div>
-                            <div class="stat-label">Won Bids</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card info">
-                            <div class="stat-value" id="pendingBids">0</div>
-                            <div class="stat-label">Pending</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card warning">
-                            <div class="stat-value" id="winRate">0%</div>
-                            <div class="stat-label">Win Rate</div>
-                        </div>
-                    </div>
-                </div>
-                
                 <!-- Tabs -->
                 <div class="card">
                     <div class="card-header">
@@ -232,9 +170,6 @@ const BidsComponent = {
                 this.loadBids();
             });
         }
-        
-        // Export button
-        DOM.on('exportBids', 'click', () => this.exportBids());
     },
     
     // Load bids
@@ -253,7 +188,6 @@ const BidsComponent = {
             
             this.state.bids = bids;
             this.renderBids();
-            this.updateStats();
             
             // Load available projects for contractors
             if (['installation_company', 'operations'].includes(user.role)) {
@@ -477,42 +411,6 @@ const BidsComponent = {
         `;
     },
     
-    // Update stats
-    updateStats() {
-        const user = State.getUser();
-        
-        if (user.role === 'admin' || user.role === 'project_manager') {
-            // Manager stats
-            DOM.setText('totalBidsCount', this.state.bids.length);
-            DOM.setText('pendingBidsCount', 
-                this.state.bids.filter(b => b.status === 'pending').length);
-            
-            const avgAmount = this.state.bids.length > 0
-                ? this.state.bids.reduce((sum, b) => sum + parseFloat(b.amount), 0) / this.state.bids.length
-                : 0;
-            DOM.setText('averageBidAmount', Formatter.currency(avgAmount));
-            
-            const uniqueProjects = new Set(this.state.bids.map(b => b.project_id));
-            DOM.setText('projectsWithBids', uniqueProjects.size);
-        } else {
-            // Contractor stats
-            DOM.setText('myTotalBids', this.state.bids.length);
-            DOM.setText('wonBids', 
-                this.state.bids.filter(b => b.status === 'won').length);
-            DOM.setText('pendingBids', 
-                this.state.bids.filter(b => b.status === 'pending').length);
-            
-            const wonCount = this.state.bids.filter(b => b.status === 'won').length;
-            const totalCompleted = this.state.bids.filter(b => 
-                ['won', 'lost'].includes(b.status)).length;
-            
-            const winRate = totalCompleted > 0 
-                ? ((wonCount / totalCompleted) * 100).toFixed(1)
-                : 0;
-            DOM.setText('winRate', winRate + '%');
-        }
-    },
-    
     // Load available projects
     async loadAvailableProjects() {
         try {
@@ -626,16 +524,6 @@ const BidsComponent = {
             await this.loadBids();
         } catch (error) {
             App.showError('Failed to accept bid');
-        }
-    },
-    
-    // Export bids
-    async exportBids() {
-        try {
-            // Implementation for export
-            App.showSuccess('Export started');
-        } catch (error) {
-            App.showError('Failed to export bids');
         }
     },
     

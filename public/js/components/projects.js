@@ -20,76 +20,93 @@ const ProjectsComponent = {
         try {
             App.showLoading(true);
             
-            // Set page actions based on role
-            const pageActions = this.getPageActions();
-            DOM.setHTML('pageActions', pageActions);
+            const user = State.getUser();
+            const isAdmin = user.role === 'admin';
+            const canCreateProjects = ['project_manager', 'admin'].includes(user.role);
             
-            // Render layout
+            // Set page actions - Always show Create Project button for authorized users
+            if (canCreateProjects) {
+                DOM.setHTML('pageActions', `
+                    <button class="btn btn-primary" onclick="ProjectsComponent.showCreateModal()">
+                        <i class="fas fa-plus"></i> New Project
+                    </button>
+                    <button class="btn btn-outline" onclick="ProjectsComponent.exportProjects()">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                `);
+            } else {
+                DOM.setHTML('pageActions', `
+                    <button class="btn btn-outline" onclick="ProjectsComponent.toggleView()">
+                        <i class="fas fa-th"></i> View
+                    </button>
+                `);
+            }
+            
+            // Render layout with always-visible create button in the search bar
             const content = `
                 <div class="projects-container">
-                    <!-- Filters -->
-                    <div class="filter-bar">
-                        <div class="filter-group">
-                            <div class="search-box">
-                                <i class="fas fa-search search-icon"></i>
-                                <input type="text" 
-                                       id="projectSearch" 
-                                       class="search-input" 
-                                       placeholder="Search projects...">
-                                <button class="search-clear" id="clearSearch" style="display: none;">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                    <!-- Search and Filters -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <div class="search-box">
+                                        <i class="fas fa-search search-icon"></i>
+                                        <input type="text" 
+                                            class="form-control search-input" 
+                                            id="projectSearch"
+                                            placeholder="Search projects...">
+                                        <button class="clear-search" id="clearSearch" style="display: none;">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="d-flex gap-2">
+                                        <select class="form-control" id="statusFilter">
+                                            <option value="">All Status</option>
+                                            <option value="draft">Draft</option>
+                                            <option value="bidding">Open for Bidding</option>
+                                            <option value="reviewing">Under Review</option>
+                                            <option value="awarded">Awarded</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                        
+                                        <select class="form-control" id="sortBy">
+                                            <option value="created_at_desc">Newest First</option>
+                                            <option value="created_at_asc">Oldest First</option>
+                                            <option value="bid_due_date_asc">Due Date (Earliest)</option>
+                                            <option value="bid_due_date_desc">Due Date (Latest)</option>
+                                            <option value="title_asc">Title (A-Z)</option>
+                                            <option value="title_desc">Title (Z-A)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-2 text-right">
+                                    ${canCreateProjects ? `
+                                        <button class="btn btn-primary btn-icon-text" onclick="ProjectsComponent.showCreateModal()">
+                                            <i class="fas fa-plus-circle"></i>
+                                            <span>Create Project</span>
+                                        </button>
+                                    ` : ''}
+                                </div>
                             </div>
                         </div>
-                        
-                        <div class="filter-group">
-                            <label class="filter-label">Status:</label>
-                            <select id="statusFilter" class="form-control filter-select">
-                                <option value="">All Status</option>
-                                <option value="draft">Draft</option>
-                                <option value="bidding">Open for Bidding</option>
-                                <option value="reviewing">Under Review</option>
-                                <option value="awarded">Awarded</option>
-                                <option value="completed">Completed</option>
-                            </select>
-                        </div>
-                        
-                        <div class="filter-group">
-                            <label class="filter-label">Sort by:</label>
-                            <select id="sortBy" class="form-control filter-select">
-                                <option value="created_at">Date Created</option>
-                                <option value="bid_due_date">Bid Due Date</option>
-                                <option value="delivery_date">Delivery Date</option>
-                                <option value="title">Title</option>
-                                <option value="max_bid">Max Bid</option>
-                            </select>
-                        </div>
-                        
-                        <div class="filter-group">
-                            <button class="btn btn-outline" id="resetFilters">
-                                <i class="fas fa-redo"></i> Reset
-                            </button>
-                        </div>
                     </div>
                     
-                    <!-- Projects Grid/List -->
-                    <div id="projectsList" class="project-grid">
-                        <!-- Projects will be loaded here -->
-                    </div>
+                    <!-- Projects List -->
+                    <div id="projectsList"></div>
                     
                     <!-- Pagination -->
-                    <div id="projectsPagination" class="pagination">
-                        <!-- Pagination will be loaded here -->
-                    </div>
+                    <div class="pagination-container" id="projectsPagination"></div>
                 </div>
             `;
             
             DOM.setHTML('pageContent', content);
-            
-            // Initialize event listeners
             this.initializeEventListeners();
-            
-            // Load projects
             await this.loadProjects();
             
         } catch (error) {
@@ -110,9 +127,6 @@ const ProjectsComponent = {
             return `
                 <button class="btn btn-primary" onclick="ProjectsComponent.showCreateModal()">
                     <i class="fas fa-plus"></i> New Project
-                </button>
-                <button class="btn btn-outline" onclick="ProjectsComponent.exportProjects()">
-                    <i class="fas fa-download"></i> Export
                 </button>
             `;
         }
@@ -408,8 +422,9 @@ const ProjectsComponent = {
         const user = State.getUser();
         const status = Formatter.status(project.status, 'project');
         const isManager = user.id === project.project_manager_id;
+        const isAdmin = user.role === 'admin';
         const canBid = ['installation_company', 'operations'].includes(user.role) && 
-                      project.status === 'bidding';
+                    project.status === 'bidding';
         
         return `
             <div class="project-detail">
@@ -433,10 +448,10 @@ const ProjectsComponent = {
                             </div>
                             
                             <div class="project-actions">
-                                ${isManager ? this.renderManagerActions(project) : ''}
-                                ${canBid ? `
+                                ${(isManager || isAdmin) ? this.renderManagerActions(project, isAdmin) : ''}
+                                ${canBid || (isAdmin && !canBid) ? `
                                     <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
-                                        <i class="fas fa-gavel"></i> Place Bid
+                                        <i class="fas fa-gavel"></i> Place Bid${isAdmin && !canBid ? ' (Admin)' : ''}
                                     </button>
                                 ` : ''}
                             </div>
@@ -444,47 +459,44 @@ const ProjectsComponent = {
                     </div>
                 </div>
                 
-                <!-- Project Tabs -->
-                <div class="card mt-3">
-                    <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-tab="details">Details</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="bids">Bids (${project.bids?.length || 0})</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="files">Files (${project.files?.length || 0})</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="timeline">Timeline</a>
-                            </li>
-                        </ul>
+                <!-- Apple-Style Tabs WITHOUT TIMELINE -->
+                <div class="apple-tabs-container mt-3">
+                    <ul class="apple-tabs">
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link active" data-tab="details">
+                                <i class="fas fa-info-circle tab-icon"></i>
+                                <span>Details</span>
+                            </button>
+                        </li>
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link" data-tab="bids">
+                                <i class="fas fa-gavel tab-icon"></i>
+                                <span>Bids</span>
+                                <span class="apple-tab-badge">${project.bids?.length || 0}</span>
+                            </button>
+                        </li>
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link" data-tab="files">
+                                <i class="fas fa-folder tab-icon"></i>
+                                <span>Files</span>
+                                <span class="apple-tab-badge">${project.files?.length || 0}</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Tab Content WITHOUT TIMELINE -->
+                <div class="apple-tab-content">
+                    <div class="apple-tab-pane active" data-tab-content="details">
+                        ${this.renderProjectDetailsTab(project)}
                     </div>
                     
-                    <div class="card-body">
-                        <div class="tab-content">
-                            <!-- Details Tab -->
-                            <div class="tab-pane active" data-tab-content="details">
-                                ${this.renderProjectDetailsTab(project)}
-                            </div>
-                            
-                            <!-- Bids Tab -->
-                            <div class="tab-pane" data-tab-content="bids">
-                                ${this.renderProjectBidsTab(project)}
-                            </div>
-                            
-                            <!-- Files Tab -->
-                            <div class="tab-pane" data-tab-content="files">
-                                ${this.renderProjectFilesTab(project)}
-                            </div>
-                            
-                            <!-- Timeline Tab -->
-                            <div class="tab-pane" data-tab-content="timeline">
-                                ${this.renderProjectTimelineTab(project)}
-                            </div>
-                        </div>
+                    <div class="apple-tab-pane" data-tab-content="bids">
+                        ${this.renderProjectBidsTab(project)}
+                    </div>
+                    
+                    <div class="apple-tab-pane" data-tab-content="files">
+                        ${this.renderProjectFilesTab(project)}
                     </div>
                 </div>
             </div>
@@ -492,10 +504,13 @@ const ProjectsComponent = {
     },
     
     // Render manager actions
-    renderManagerActions(project) {
+    renderManagerActions(project, isAdmin = false) {
+        const user = State.getUser();
+        const isManager = user.id === project.project_manager_id;
         const actions = [];
         
-        if (project.status === 'draft') {
+        // Admin can perform all actions
+        if (isAdmin || (isManager && project.status === 'draft')) {
             actions.push(`
                 <button class="btn btn-success" onclick="ProjectsComponent.startBidding(${project.id})">
                     <i class="fas fa-play"></i> Start Bidding
@@ -503,7 +518,15 @@ const ProjectsComponent = {
             `);
         }
         
-        if (project.status === 'reviewing' && project.bids?.length > 0) {
+        if (isAdmin || (isManager && project.status === 'bidding')) {
+            actions.push(`
+                <button class="btn btn-warning" onclick="ProjectsComponent.closeBidding(${project.id})">
+                    <i class="fas fa-stop"></i> Close Bidding
+                </button>
+            `);
+        }
+        
+        if (isAdmin || (isManager && project.status === 'reviewing' && project.bids?.length > 0)) {
             actions.push(`
                 <button class="btn btn-primary" onclick="ProjectsComponent.showAwardModal(${project.id})">
                     <i class="fas fa-trophy"></i> Award Project
@@ -511,7 +534,7 @@ const ProjectsComponent = {
             `);
         }
         
-        if (project.status === 'awarded') {
+        if (isAdmin || (isManager && project.status === 'awarded')) {
             actions.push(`
                 <button class="btn btn-success" onclick="ProjectsComponent.markComplete(${project.id})">
                     <i class="fas fa-check"></i> Mark Complete
@@ -519,11 +542,33 @@ const ProjectsComponent = {
             `);
         }
         
-        if (['draft', 'bidding'].includes(project.status)) {
+        if (isAdmin || (isManager && ['draft', 'bidding'].includes(project.status))) {
             actions.push(`
                 <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
                     <i class="fas fa-edit"></i> Edit
                 </button>
+            `);
+        }
+        
+        // Admin-only test actions
+        if (isAdmin) {
+            actions.push(`
+                <div class="dropdown d-inline-block ml-2">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">
+                        <i class="fas fa-cog"></i> Admin Actions
+                    </button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" onclick="ProjectsComponent.adminReviewBid(${project.id})">
+                            <i class="fas fa-star"></i> Review as Bidder
+                        </a>
+                        <a class="dropdown-item" onclick="ProjectsComponent.adminCompleteProject(${project.id})">
+                            <i class="fas fa-flag-checkered"></i> Force Complete
+                        </a>
+                        <a class="dropdown-item" onclick="ProjectsComponent.adminResetProject(${project.id})">
+                            <i class="fas fa-undo"></i> Reset to Draft
+                        </a>
+                    </div>
+                </div>
             `);
         }
         
@@ -585,32 +630,37 @@ const ProjectsComponent = {
         return '<div>Files content...</div>';
     },
     
-    renderProjectTimelineTab(project) {
-        // Implementation for timeline tab
-        return '<div>Timeline content...</div>';
-    },
-    
     // Initialize detail event listeners
     initializeDetailEventListeners() {
-        // Tab switching
-        document.querySelectorAll('.nav-link[data-tab]').forEach(tab => {
+        // Apple-style tab switching
+        document.querySelectorAll('.apple-tab-link').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.switchTab(e.target.dataset.tab);
+                this.switchTab(e.currentTarget.dataset.tab);
             });
         });
     },
     
     // Switch tab
     switchTab(tabName) {
-        // Update nav links
-        document.querySelectorAll('.nav-link[data-tab]').forEach(tab => {
+        // Update tab links with smooth transition
+        document.querySelectorAll('.apple-tab-link').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.tab === tabName);
         });
         
-        // Update tab content
-        document.querySelectorAll('.tab-pane[data-tab-content]').forEach(pane => {
-            pane.classList.toggle('active', pane.dataset.tabContent === tabName);
+        // Update tab content with fade animation
+        document.querySelectorAll('.apple-tab-pane').forEach(pane => {
+            if (pane.dataset.tabContent === tabName) {
+                pane.style.display = 'block';
+                setTimeout(() => pane.classList.add('active'), 10);
+            } else {
+                pane.classList.remove('active');
+                setTimeout(() => {
+                    if (!pane.classList.contains('active')) {
+                        pane.style.display = 'none';
+                    }
+                }, 300);
+            }
         });
     },
     
@@ -678,16 +728,6 @@ const ProjectsComponent = {
         this.loadProjects();
     },
     
-    // Export projects
-    async exportProjects() {
-        try {
-            // Implementation for export
-            App.showSuccess('Export started');
-        } catch (error) {
-            App.showError('Failed to export projects');
-        }
-    },
-    
     // Toggle view
     toggleView() {
         const container = DOM.get('projectsList');
@@ -711,6 +751,70 @@ const ProjectsComponent = {
         const statusFilter = DOM.get('statusFilter');
         if (statusFilter) {
             statusFilter.value = status;
+        }
+    },
+
+    // Admin test methods
+    async closeBidding(projectId) {
+        if (!confirm('Are you sure you want to close bidding for this project?')) {
+            return;
+        }
+        
+        try {
+            await API.post(`/projects/${projectId}/close-bidding`);
+            App.showSuccess('Bidding closed successfully');
+            this.loadProjects();
+        } catch (error) {
+            App.showError('Failed to close bidding');
+        }
+    },
+
+    async adminReviewBid(projectId) {
+        // Allow admin to leave a review as if they were the winning bidder
+        const rating = prompt('Enter rating (1-5):');
+        const review = prompt('Enter review comment:');
+        
+        if (rating && review) {
+            try {
+                await API.post(`/ratings`, {
+                    project_id: projectId,
+                    rating: parseInt(rating),
+                    review: review,
+                    as_admin: true
+                });
+                App.showSuccess('Review submitted as admin');
+                this.renderDetail(projectId);
+            } catch (error) {
+                App.showError('Failed to submit review');
+            }
+        }
+    },
+
+    async adminCompleteProject(projectId) {
+        if (!confirm('Force complete this project as admin?')) {
+            return;
+        }
+        
+        try {
+            await API.post(`/projects/${projectId}/admin-complete`);
+            App.showSuccess('Project completed by admin');
+            this.renderDetail(projectId);
+        } catch (error) {
+            App.showError('Failed to complete project');
+        }
+    },
+
+    async adminResetProject(projectId) {
+        if (!confirm('Reset this project to draft status?')) {
+            return;
+        }
+        
+        try {
+            await API.post(`/projects/${projectId}/admin-reset`);
+            App.showSuccess('Project reset to draft');
+            this.renderDetail(projectId);
+        } catch (error) {
+            App.showError('Failed to reset project');
         }
     }
 };

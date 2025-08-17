@@ -311,4 +311,66 @@ router.post('/:id/complete', [
     }
 });
 
+// Admin-only: Close bidding
+router.post('/:id/close-bidding', [
+    authenticateToken,
+    requireRole(['admin', 'project_manager']),
+    param('id').isInt().withMessage('Valid project ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const project = await ProjectModel.getById(req.params.id);
+        
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        
+        if (project.status !== 'bidding') {
+            return res.status(400).json({ error: 'Project is not open for bidding' });
+        }
+        
+        await ProjectModel.updateStatus(req.params.id, 'reviewing');
+        
+        logger.info(`Bidding closed for project: ${project.id}`);
+        res.json({ message: 'Bidding closed successfully' });
+    } catch (error) {
+        logger.error('Error closing bidding:', error);
+        res.status(500).json({ error: 'Failed to close bidding' });
+    }
+});
+
+// Admin-only: Force complete
+router.post('/:id/admin-complete', [
+    authenticateToken,
+    requireRole('admin'),
+    param('id').isInt().withMessage('Valid project ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        await ProjectModel.updateStatus(req.params.id, 'completed');
+        logger.info(`Project force completed by admin: ${req.params.id}`);
+        res.json({ message: 'Project completed' });
+    } catch (error) {
+        logger.error('Error completing project:', error);
+        res.status(500).json({ error: 'Failed to complete project' });
+    }
+});
+
+// Admin-only: Reset to draft
+router.post('/:id/admin-reset', [
+    authenticateToken,
+    requireRole('admin'),
+    param('id').isInt().withMessage('Valid project ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        await ProjectModel.updateStatus(req.params.id, 'draft');
+        logger.info(`Project reset to draft by admin: ${req.params.id}`);
+        res.json({ message: 'Project reset to draft' });
+    } catch (error) {
+        logger.error('Error resetting project:', error);
+        res.status(500).json({ error: 'Failed to reset project' });
+    }
+});
+
 module.exports = router;

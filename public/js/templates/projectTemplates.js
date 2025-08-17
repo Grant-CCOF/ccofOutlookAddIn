@@ -299,12 +299,6 @@ const ProjectTemplates = {
         }
         
         // Common actions
-        actions.push(`
-            <button class="btn btn-outline" onclick="ProjectsComponent.exportProject(${project.id})">
-                <i class="fas fa-download"></i> Export
-            </button>
-        `);
-        
         if (isManager) {
             actions.push(`
                 <button class="btn btn-danger" onclick="ProjectsComponent.deleteProject(${project.id})">
@@ -499,14 +493,9 @@ const ProjectTemplates = {
                 <h3 class="empty-state-title">${message}</h3>
                 <p class="empty-state-description">
                     ${Auth.hasRole(['project_manager', 'admin']) 
-                        ? 'Get started by creating your first project.'
+                        ? 'Get started by creating your first project using the button above.'
                         : 'Check back later for new projects to bid on.'}
                 </p>
-                ${Auth.hasRole(['project_manager', 'admin']) ? `
-                    <button class="btn btn-primary" onclick="ProjectsComponent.showCreateModal()">
-                        <i class="fas fa-plus"></i> Create Project
-                    </button>
-                ` : ''}
             </div>
         `;
     },

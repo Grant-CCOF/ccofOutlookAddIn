@@ -2,11 +2,12 @@
 
 const ProjectModals = {
     // Show create project modal
-    showCreateModal() {
+    async showCreateModal() {
         const modal = this.createModal('Create New Project', this.getProjectForm());
         
-        // Initialize form
+        // Initialize form and file upload
         this.initializeProjectForm('createProjectForm');
+        this.initializeFileUpload('createProjectForm');
         
         // Handle submit
         DOM.on('createProjectForm', 'submit', async (e) => {
@@ -16,11 +17,22 @@ const ProjectModals = {
     },
     
     // Show edit project modal
-    showEditModal(project) {
+    async showEditModal(project) {
+        // Load project files if not already loaded
+        if (!project.files) {
+            try {
+                project.files = await API.files.getProjectFiles(project.id);
+            } catch (error) {
+                console.error('Failed to load project files:', error);
+                project.files = [];
+            }
+        }
+        
         const modal = this.createModal('Edit Project', this.getProjectForm(project));
         
-        // Initialize form with project data
+        // Initialize form and file upload
         this.initializeProjectForm('editProjectForm', project);
+        this.initializeFileUpload('editProjectForm', project.files);
         
         // Handle submit
         DOM.on('editProjectForm', 'submit', async (e) => {
@@ -80,133 +92,144 @@ const ProjectModals = {
         });
     },
     
-    // Get project form
+    // Get project form with file upload
     getProjectForm(project = null) {
         const isEdit = project !== null;
         const formId = isEdit ? 'editProjectForm' : 'createProjectForm';
         
         return `
-            <form id="${formId}">
+            <form id="${formId}" class="project-form">
                 <div class="form-group">
-                    <label>Project Title <span class="required">*</span></label>
+                    <label>Project Title <span class="text-danger">*</span></label>
                     <input type="text" 
-                           class="form-control" 
-                           name="title" 
-                           value="${project?.title || ''}"
-                           required>
+                        class="form-control" 
+                        name="title" 
+                        value="${project?.title || ''}"
+                        required>
                 </div>
                 
                 <div class="form-group">
-                    <label>Description <span class="required">*</span></label>
+                    <label>Description <span class="text-danger">*</span></label>
                     <textarea class="form-control" 
-                              name="description" 
-                              rows="4" 
-                              required>${project?.description || ''}</textarea>
+                            name="description" 
+                            rows="4"
+                            required>${project?.description || ''}</textarea>
                 </div>
                 
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>ZIP Code <span class="required">*</span></label>
+                            <label>ZIP Code <span class="text-danger">*</span></label>
                             <input type="text" 
-                                   class="form-control" 
-                                   name="zip_code" 
-                                   value="${project?.zip_code || ''}"
-                                   pattern="^\\d{5}(-\\d{4})?$"
-                                   placeholder="12345"
-                                   required>
+                                class="form-control" 
+                                name="zip_code" 
+                                value="${project?.zip_code || ''}"
+                                pattern="[0-9]{5}"
+                                required>
                         </div>
                     </div>
-                    
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Max Bid Amount</label>
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text">$</span>
-                                </div>
-                                <input type="number" 
-                                       class="form-control" 
-                                       name="max_bid" 
-                                       value="${project?.max_bid || ''}"
-                                       min="0" 
-                                       step="0.01">
+                            <label>Budget Range</label>
+                            <select class="form-control" name="budget_range">
+                                <option value="">Select Range</option>
+                                <option value="0-5000" ${project?.budget_range === '0-5000' ? 'selected' : ''}>$0 - $5,000</option>
+                                <option value="5000-10000" ${project?.budget_range === '5000-10000' ? 'selected' : ''}>$5,000 - $10,000</option>
+                                <option value="10000-25000" ${project?.budget_range === '10000-25000' ? 'selected' : ''}>$10,000 - $25,000</option>
+                                <option value="25000-50000" ${project?.budget_range === '25000-50000' ? 'selected' : ''}>$25,000 - $50,000</option>
+                                <option value="50000+" ${project?.budget_range === '50000+' ? 'selected' : ''}>$50,000+</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Bid Due Date <span class="text-danger">*</span></label>
+                            <input type="datetime-local" 
+                                class="form-control" 
+                                name="bid_due_date" 
+                                id="bidDueDate"
+                                value="${project ? this.formatDateForInput(project.bid_due_date) : ''}"
+                                required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Delivery Date <span class="text-danger">*</span></label>
+                            <input type="date" 
+                                class="form-control" 
+                                name="delivery_date" 
+                                id="deliveryDate"
+                                value="${project?.delivery_date?.split('T')[0] || ''}"
+                                required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Maximum Bid Amount</label>
+                            <input type="number" 
+                                class="form-control" 
+                                name="max_bid" 
+                                value="${project?.max_bid || ''}"
+                                min="0"
+                                step="0.01"
+                                placeholder="Optional">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Show Maximum Bid</label>
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" 
+                                    class="custom-control-input" 
+                                    id="showMaxBid"
+                                    name="show_max_bid"
+                                    ${project?.show_max_bid ? 'checked' : ''}>
+                                <label class="custom-control-label" for="showMaxBid">
+                                    Display maximum bid to contractors
+                                </label>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Bid Due Date <span class="required">*</span></label>
-                            <input type="datetime-local" 
-                                   class="form-control" 
-                                   name="bid_due_date" 
-                                   value="${project?.bid_due_date ? this.formatDateForInput(project.bid_due_date) : ''}"
-                                   required>
-                        </div>
+                <!-- File Upload Section -->
+                <div class="form-group">
+                    <label>Project Files</label>
+                    <div class="file-upload-area" id="${formId}FileUpload">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Click to upload files or drag and drop</p>
+                        <small>PDF, DOC, DOCX, XLS, XLSX, TXT, Images (Max 10MB each)</small>
+                    </div>
+                    <input type="file" 
+                        id="${formId}FileInput" 
+                        multiple 
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                        style="display: none;">
+                    
+                    <!-- Files List -->
+                    <div id="${formId}FileList" class="file-list mt-3">
+                        ${isEdit && project.files ? this.renderExistingFiles(project.files) : ''}
                     </div>
                     
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Delivery Date <span class="required">*</span></label>
-                            <input type="date" 
-                                   class="form-control" 
-                                   name="delivery_date" 
-                                   value="${project?.delivery_date ? project.delivery_date.split('T')[0] : ''}"
-                                   required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <div class="custom-control custom-checkbox">
-                        <input type="checkbox" 
-                               class="custom-control-input" 
-                               id="showMaxBid"
-                               name="show_max_bid"
-                               ${project?.show_max_bid ? 'checked' : ''}>
-                        <label class="custom-control-label" for="showMaxBid">
-                            Show maximum bid amount to contractors
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Site Conditions</label>
-                    <div id="siteConditions">
-                        ${project?.site_conditions ? 
-                            project.site_conditions.map((condition, index) => `
-                                <div class="input-group mb-2">
-                                    <input type="text" 
-                                           class="form-control" 
-                                           name="site_conditions[]" 
-                                           value="${condition}">
-                                    <div class="input-group-append">
-                                        <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.parentElement.remove()">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('') : 
-                            '<div class="input-group mb-2"><input type="text" class="form-control" name="site_conditions[]" placeholder="Enter site condition"></div>'
-                        }
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="ProjectModals.addSiteCondition()">
-                        <i class="fas fa-plus"></i> Add Condition
-                    </button>
+                    <!-- Temporary files for upload -->
+                    <div id="${formId}TempFiles" class="temp-files-list mt-2"></div>
                 </div>
                 
                 ${!isEdit ? `
                     <div class="form-group">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" 
-                                   class="custom-control-input" 
-                                   id="startBidding"
-                                   name="start_bidding">
+                                class="custom-control-input" 
+                                id="startBidding"
+                                name="start_bidding">
                             <label class="custom-control-label" for="startBidding">
-                                Start bidding immediately after creation
+                                Immediately open for bidding after creation
                             </label>
                         </div>
                     </div>
@@ -214,37 +237,183 @@ const ProjectModals = {
             </form>
         `;
     },
-    
-    // Initialize project form
-    initializeProjectForm(formId, project = null) {
-        // Set minimum dates
-        const form = DOM.get(formId);
-        if (!form) return;
+
+    // Render existing files for editing
+    renderExistingFiles(files) {
+        if (!files || files.length === 0) return '';
         
-        const today = new Date().toISOString().split('T')[0];
-        const bidDueDateInput = form.querySelector('[name="bid_due_date"]');
-        const deliveryDateInput = form.querySelector('[name="delivery_date"]');
-        
-        if (bidDueDateInput) {
-            bidDueDateInput.min = today;
-        }
-        
-        if (deliveryDateInput) {
-            deliveryDateInput.min = today;
-        }
-        
-        // Add date validation
-        bidDueDateInput?.addEventListener('change', () => {
-            if (deliveryDateInput && bidDueDateInput.value) {
-                const bidDate = new Date(bidDueDateInput.value);
-                const minDelivery = new Date(bidDate);
-                minDelivery.setDate(minDelivery.getDate() + 1);
-                deliveryDateInput.min = minDelivery.toISOString().split('T')[0];
-            }
-        });
+        return `
+            <div class="existing-files">
+                <h6>Current Files:</h6>
+                ${files.map(file => `
+                    <div class="file-item existing-file" data-file-id="${file.id}">
+                        <div class="file-info">
+                            <i class="fas ${FileUpload.getFileIcon(file.name)}"></i>
+                            <span class="file-name">${file.original_name || file.name}</span>
+                            <span class="file-size">(${Formatter.fileSize(file.size)})</span>
+                        </div>
+                        <button type="button" 
+                                class="btn-icon btn-danger" 
+                                onclick="ProjectModals.removeExistingFile(${file.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     },
     
-    // Handle create project
+    // Initialize project form with file upload
+    initializeProjectForm(formId, project = null) {
+        // Set minimum dates
+        const bidDueDateInput = DOM.get('bidDueDate');
+        const deliveryDateInput = DOM.get('deliveryDate');
+        
+        if (bidDueDateInput) {
+            const minDate = new Date();
+            minDate.setHours(minDate.getHours() + 1);
+            bidDueDateInput.min = minDate.toISOString().slice(0, 16);
+            
+            bidDueDateInput.addEventListener('change', (e) => {
+                const bidDue = new Date(e.target.value);
+                const minDelivery = new Date(bidDue);
+                minDelivery.setDate(minDelivery.getDate() + 1);
+                deliveryDateInput.min = minDelivery.toISOString().split('T')[0];
+            });
+        }
+        
+        // Initialize file upload
+        this.initializeFileUpload(formId, project?.files);
+    },
+
+    // Initialize file upload for project form
+    initializeFileUpload(formId, existingFiles = []) {
+        const uploadArea = DOM.get(`${formId}FileUpload`);
+        const fileInput = DOM.get(`${formId}FileInput`);
+        const tempFilesList = DOM.get(`${formId}TempFiles`);
+        
+        if (!uploadArea || !fileInput) return;
+        
+        // Store temp files for upload
+        this.tempFiles = new Map();
+        this.filesToDelete = new Set();
+        
+        // Click to upload
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            this.handleNewFiles(files, formId);
+        });
+        
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragging');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragging');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragging');
+            
+            const files = Array.from(e.dataTransfer.files);
+            this.handleNewFiles(files, formId);
+        });
+    },
+
+    // Handle new files
+    handleNewFiles(files, formId) {
+        const tempFilesList = DOM.get(`${formId}TempFiles`);
+        
+        files.forEach(file => {
+            // Validate file
+            const validation = FileUpload.validateFile(file, {
+                maxSize: 10 * 1024 * 1024, // 10MB
+                allowedTypes: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.jpg', '.jpeg', '.png']
+            });
+            
+            if (!validation.valid) {
+                App.showError(validation.message);
+                return;
+            }
+            
+            // Generate unique ID for temp file
+            const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            this.tempFiles.set(tempId, file);
+            
+            // Add to UI
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item temp-file';
+            fileItem.dataset.tempId = tempId;
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <i class="fas ${FileUpload.getFileIcon(file.name)}"></i>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">(${Formatter.fileSize(file.size)})</span>
+                    <span class="badge badge-info ml-2">New</span>
+                </div>
+                <button type="button" 
+                        class="btn-icon btn-danger" 
+                        onclick="ProjectModals.removeTempFile('${tempId}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            tempFilesList.appendChild(fileItem);
+        });
+    },
+
+    // Remove temporary file
+    removeTempFile(tempId) {
+        this.tempFiles.delete(tempId);
+        const fileItem = document.querySelector(`[data-temp-id="${tempId}"]`);
+        if (fileItem) {
+            fileItem.remove();
+        }
+    },
+
+    // Remove existing file (mark for deletion)
+    removeExistingFile(fileId) {
+        if (!confirm('Are you sure you want to remove this file?')) {
+            return;
+        }
+        
+        this.filesToDelete.add(fileId);
+        const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+        if (fileItem) {
+            fileItem.style.opacity = '0.5';
+            fileItem.style.textDecoration = 'line-through';
+            const deleteBtn = fileItem.querySelector('.btn-danger');
+            if (deleteBtn) {
+                deleteBtn.innerHTML = '<i class="fas fa-undo"></i>';
+                deleteBtn.onclick = () => this.undoRemoveFile(fileId);
+            }
+        }
+    },
+
+    // Undo file removal
+    undoRemoveFile(fileId) {
+        this.filesToDelete.delete(fileId);
+        const fileItem = document.querySelector(`[data-file-id="${fileId}"]`);
+        if (fileItem) {
+            fileItem.style.opacity = '1';
+            fileItem.style.textDecoration = 'none';
+            const undoBtn = fileItem.querySelector('.btn-danger');
+            if (undoBtn) {
+                undoBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                undoBtn.onclick = () => this.removeExistingFile(fileId);
+            }
+        }
+    },
+    
+    // Handle create project with file upload
     async handleCreateProject() {
         try {
             const form = DOM.get('createProjectForm');
@@ -263,11 +432,22 @@ const ProjectModals = {
             App.showLoading(true);
             
             // Create project
-            const response = await API.projects.create(data);
+            const project = await API.projects.create(data);
+            
+            // Upload files if any
+            if (this.tempFiles && this.tempFiles.size > 0) {
+                const uploadPromises = [];
+                for (const [tempId, file] of this.tempFiles) {
+                    uploadPromises.push(
+                        API.files.upload(file, { project_id: project.id })
+                    );
+                }
+                await Promise.all(uploadPromises);
+            }
             
             // Start bidding if requested
             if (data.start_bidding) {
-                await API.projects.startBidding(response.id);
+                await API.projects.startBidding(project.id);
             }
             
             App.showSuccess('Project created successfully');
@@ -284,8 +464,8 @@ const ProjectModals = {
             App.showLoading(false);
         }
     },
-    
-    // Handle edit project
+
+    // Handle edit project with file management
     async handleEditProject(projectId) {
         try {
             const form = DOM.get('editProjectForm');
@@ -306,12 +486,32 @@ const ProjectModals = {
             // Update project
             await API.projects.update(projectId, data);
             
+            // Handle file deletions
+            if (this.filesToDelete && this.filesToDelete.size > 0) {
+                const deletePromises = [];
+                for (const fileId of this.filesToDelete) {
+                    deletePromises.push(API.files.delete(fileId));
+                }
+                await Promise.all(deletePromises);
+            }
+            
+            // Upload new files
+            if (this.tempFiles && this.tempFiles.size > 0) {
+                const uploadPromises = [];
+                for (const [tempId, file] of this.tempFiles) {
+                    uploadPromises.push(
+                        API.files.upload(file, { project_id: projectId })
+                    );
+                }
+                await Promise.all(uploadPromises);
+            }
+            
             App.showSuccess('Project updated successfully');
             this.closeModal();
             
             // Refresh project details or list
             if (window.ProjectsComponent) {
-                if (Router.currentRoute.includes('/projects/')) {
+                if (window.location.hash.includes(`/projects/${projectId}`)) {
                     ProjectsComponent.renderDetail(projectId);
                 } else {
                     ProjectsComponent.refreshProjects();

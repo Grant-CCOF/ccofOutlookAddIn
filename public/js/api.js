@@ -344,3 +344,57 @@ API.reports = {
     getAll: () => API.get('/reports'),
     delete: (id) => API.delete(`/reports/${id}`)
 };
+
+API.upload = async function(endpoint, file, additionalData = {}) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Add additional data
+    Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, value);
+    });
+    
+    const response = await fetch(`${Config.API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${Auth.getToken()}`
+        },
+        body: formData
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+    }
+    
+    return response.json();
+};
+
+API.uploadMultiple = async function(endpoint, files, additionalData = {}) {
+    const formData = new FormData();
+    
+    // Add all files
+    files.forEach(file => {
+        formData.append('files', file);
+    });
+    
+    // Add additional data
+    Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, value);
+    });
+    
+    const response = await fetch(`${Config.API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${Auth.getToken()}`
+        },
+        body: formData
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+    }
+    
+    return response.json();
+};

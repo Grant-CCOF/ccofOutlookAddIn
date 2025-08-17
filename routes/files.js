@@ -37,6 +37,92 @@ const upload = multer({
     }
 });
 
+// Generic file upload endpoint
+router.post('/upload', [
+    authenticateToken,
+    upload.single('file'),
+    body('project_id').optional().isInt(),
+    body('bid_id').optional().isInt(),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        const { project_id, bid_id } = req.body;
+        
+        // Validate that either project_id or bid_id is provided
+        if (!project_id && !bid_id) {
+            return res.status(400).json({ error: 'Either project_id or bid_id must be provided' });
+        }
+        
+        // Validate access for project files
+        if (project_id) {
+            const project = await ProjectModel.getById(project_id);
+            if (!project) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
+            
+            // Check permissions
+            if (req.user.role === 'project_manager' && project.project_manager_id !== req.user.id) {
+                if (req.user.role !== 'admin') {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            }
+            
+            // Save file
+            const fileData = await fileService.saveFile(req.file, 'projects');
+            
+            // Create database record
+            const fileId = await FileModel.create({
+                ...fileData,
+                uploaded_by: req.user.id,
+                project_id: project_id
+            });
+            
+            const file = await FileModel.getById(fileId);
+            
+            logger.info(`File uploaded for project ${project_id}: ${file.original_name}`);
+            
+            return res.status(201).json(file);
+        }
+        
+        // Validate access for bid files
+        if (bid_id) {
+            const bid = await BidModel.getById(bid_id);
+            if (!bid) {
+                return res.status(404).json({ error: 'Bid not found' });
+            }
+            
+            // Check ownership
+            if (bid.user_id !== req.user.id && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            
+            // Save file
+            const fileData = await fileService.saveFile(req.file, 'bids');
+            
+            // Create database record
+            const fileId = await FileModel.create({
+                ...fileData,
+                uploaded_by: req.user.id,
+                bid_id: bid_id
+            });
+            
+            const file = await FileModel.getById(fileId);
+            
+            logger.info(`File uploaded for bid ${bid_id}: ${file.original_name}`);
+            
+            return res.status(201).json(file);
+        }
+        
+    } catch (error) {
+        logger.error('Error uploading file:', error);
+        res.status(500).json({ error: 'Failed to upload file' });
+    }
+});
+
 // Upload file for project
 router.post('/project/:projectId', [
     authenticateToken,

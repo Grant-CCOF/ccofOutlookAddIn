@@ -34,9 +34,6 @@ const UsersComponent = {
                 <button class="btn btn-primary" onclick="UsersComponent.showCreateModal()">
                     <i class="fas fa-plus"></i> Add User
                 </button>
-                <button class="btn btn-outline" onclick="UsersComponent.exportUsers()">
-                    <i class="fas fa-download"></i> Export
-                </button>
             `);
             
             // Render layout
@@ -735,16 +732,6 @@ const UsersComponent = {
     // Show create modal
     showCreateModal() {
         UserModals.showCreateModal();
-    },
-    
-    // Export users
-    async exportUsers() {
-        try {
-            // Implementation for export
-            App.showSuccess('Export started');
-        } catch (error) {
-            App.showError('Failed to export users');
-        }
     },
     
     // Reset filters

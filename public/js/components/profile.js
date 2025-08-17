@@ -103,101 +103,13 @@ const ProfileComponent = {
                             </div>
                             <div class="card-body">
                                 <form id="profileForm">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Full Name</label>
-                                                <input type="text" 
-                                                       class="form-control" 
-                                                       name="name" 
-                                                       value="${user.name}"
-                                                       ${!this.state.isEditing ? 'disabled' : ''}>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Email Address</label>
-                                                <input type="email" 
-                                                       class="form-control" 
-                                                       name="email" 
-                                                       value="${user.email}"
-                                                       ${!this.state.isEditing ? 'disabled' : ''}>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Phone Number</label>
-                                                <input type="tel" 
-                                                       class="form-control" 
-                                                       name="phone" 
-                                                       value="${user.phone || ''}"
-                                                       ${!this.state.isEditing ? 'disabled' : ''}>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Company</label>
-                                                <input type="text" 
-                                                       class="form-control" 
-                                                       name="company" 
-                                                       value="${user.company || ''}"
-                                                       ${!this.state.isEditing ? 'disabled' : ''}>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Position</label>
-                                                <input type="text" 
-                                                       class="form-control" 
-                                                       name="position" 
-                                                       value="${user.position || ''}"
-                                                       ${!this.state.isEditing ? 'disabled' : ''}>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label>Username</label>
-                                                <input type="text" 
-                                                       class="form-control" 
-                                                       value="${user.username}"
-                                                       disabled>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    ${this.state.isEditing ? `
-                                        <div class="form-group">
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="fas fa-save"></i> Save Changes
-                                            </button>
-                                            <button type="button" 
-                                                    class="btn btn-outline ml-2" 
-                                                    onclick="ProfileComponent.cancelEdit()">
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    ` : ''}
+                                    <!-- Form fields here - keep existing form structure -->
+                                    ${this.renderProfileForm(user)}
                                 </form>
                             </div>
                         </div>
                         
-                        <!-- Activity History -->
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Recent Activity</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="activityTimeline" class="timeline">
-                                    ${this.renderActivityTimeline()}
-                                </div>
-                            </div>
-                        </div>
+                        <!-- REMOVED RECENT ACTIVITY CARD -->
                         
                         <!-- Ratings (for contractors) -->
                         ${['installation_company', 'operations'].includes(user.role) ? `
@@ -206,15 +118,96 @@ const ProfileComponent = {
                                     <h5 class="card-title mb-0">My Ratings</h5>
                                 </div>
                                 <div class="card-body">
-                                    <div id="ratingsContainer">
-                                        ${this.renderRatings(stats)}
-                                    </div>
+                                    ${this.renderRatings(stats)}
                                 </div>
                             </div>
                         ` : ''}
                     </div>
                 </div>
             </div>
+        `;
+    },
+
+    renderProfileForm(user) {
+        return `
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" 
+                            class="form-control" 
+                            name="name" 
+                            value="${user.name}"
+                            ${!this.state.isEditing ? 'disabled' : ''}>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" 
+                            class="form-control" 
+                            name="email" 
+                            value="${user.email}"
+                            ${!this.state.isEditing ? 'disabled' : ''}>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" 
+                            class="form-control" 
+                            name="phone" 
+                            value="${user.phone || ''}"
+                            ${!this.state.isEditing ? 'disabled' : ''}>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" 
+                            class="form-control" 
+                            value="${user.username}"
+                            disabled>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Company</label>
+                        <input type="text" 
+                            class="form-control" 
+                            name="company" 
+                            value="${user.company || ''}"
+                            ${!this.state.isEditing ? 'disabled' : ''}>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Position</label>
+                        <input type="text" 
+                            class="form-control" 
+                            name="position" 
+                            value="${user.position || ''}"
+                            ${!this.state.isEditing ? 'disabled' : ''}>
+                    </div>
+                </div>
+            </div>
+            
+            ${this.state.isEditing ? `
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <button type="button" 
+                            class="btn btn-outline ml-2" 
+                            onclick="ProfileComponent.cancelEdit()">
+                        Cancel
+                    </button>
+                </div>
+            ` : ''}
         `;
     },
     
@@ -261,33 +254,6 @@ const ProfileComponent = {
         }
         
         return '';
-    },
-    
-    // Render activity timeline
-    renderActivityTimeline() {
-        // This would fetch and display recent activity
-        return `
-            <div class="timeline-item">
-                <div class="timeline-marker">
-                    <i class="fas fa-check"></i>
-                </div>
-                <div class="timeline-content">
-                    <div class="timeline-date">Today</div>
-                    <div class="timeline-title">Profile Updated</div>
-                    <div class="timeline-description">You updated your profile information</div>
-                </div>
-            </div>
-            <div class="timeline-item">
-                <div class="timeline-marker">
-                    <i class="fas fa-gavel"></i>
-                </div>
-                <div class="timeline-content">
-                    <div class="timeline-date">Yesterday</div>
-                    <div class="timeline-title">Bid Submitted</div>
-                    <div class="timeline-description">You submitted a bid for Project #123</div>
-                </div>
-            </div>
-        `;
     },
     
     // Render ratings
