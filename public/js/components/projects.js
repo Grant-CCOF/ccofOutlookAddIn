@@ -775,28 +775,13 @@ const ProjectsComponent = {
                 <div class="empty-state">
                     <i class="fas fa-folder-open" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
                     <h4>No Files Uploaded</h4>
-                    <p class="text-muted">No files have been uploaded for this project yet.</p>
-                    ${(State.getUserRole() === 'admin' || 
-                       (State.getUserRole() === 'project_manager' && project.project_manager_id === State.getUserId())) ? `
-                        <button class="btn btn-primary mt-3" onclick="ProjectsComponent.showUploadFileModal(${project.id})">
-                            <i class="fas fa-upload"></i> Upload Files
-                        </button>
-                    ` : ''}
+                    <p class="text-muted">No files have been uploaded for this project.</p>
                 </div>
             `;
         }
 
         return `
             <div class="files-container">
-                ${(State.getUserRole() === 'admin' || 
-                   (State.getUserRole() === 'project_manager' && project.project_manager_id === State.getUserId())) ? `
-                    <div class="mb-3">
-                        <button class="btn btn-primary" onclick="ProjectsComponent.showUploadFileModal(${project.id})">
-                            <i class="fas fa-upload"></i> Upload Files
-                        </button>
-                    </div>
-                ` : ''}
-                
                 <div class="files-list">
                     ${project.files.map(file => this.renderFileItem(file)).join('')}
                 </div>
@@ -935,7 +920,15 @@ const ProjectsComponent = {
         try {
             await API.projects.startBidding(projectId);
             App.showSuccess('Bidding started successfully');
-            this.loadProjects();
+            
+            // Check if we're on the detail page or list page
+            if (window.location.hash.includes(`/projects/${projectId}`)) {
+                // We're on the detail page, refresh the detail view
+                await this.renderDetail(projectId);
+            } else {
+                // We're on the list page, refresh the list
+                await this.loadProjects();
+            }
         } catch (error) {
             App.showError('Failed to start bidding');
         }
@@ -954,12 +947,18 @@ const ProjectsComponent = {
         try {
             await API.projects.complete(projectId);
             App.showSuccess('Project marked as complete');
-            this.renderDetail(projectId);
+            
+            // Check current page and refresh accordingly
+            if (window.location.hash.includes(`/projects/${projectId}`)) {
+                await this.renderDetail(projectId);
+            } else {
+                await this.loadProjects();
+            }
         } catch (error) {
             App.showError('Failed to complete project');
         }
     },
-    
+        
     // Reset filters
     resetFilters() {
         this.state.filters = {
@@ -1012,7 +1011,13 @@ const ProjectsComponent = {
         try {
             await API.post(`/projects/${projectId}/close-bidding`);
             App.showSuccess('Bidding closed successfully');
-            this.loadProjects();
+            
+            // Check current page and refresh accordingly
+            if (window.location.hash.includes(`/projects/${projectId}`)) {
+                await this.renderDetail(projectId);
+            } else {
+                await this.loadProjects();
+            }
         } catch (error) {
             App.showError('Failed to close bidding');
         }
@@ -1165,7 +1170,13 @@ const ProjectsComponent = {
         try {
             await API.post(`/projects/${projectId}/admin-reset`);
             App.showSuccess('Project reset to draft');
-            this.renderDetail(projectId);
+            
+            // Check current page and refresh accordingly
+            if (window.location.hash.includes(`/projects/${projectId}`)) {
+                await this.renderDetail(projectId);
+            } else {
+                await this.loadProjects();
+            }
         } catch (error) {
             App.showError('Failed to reset project');
         }

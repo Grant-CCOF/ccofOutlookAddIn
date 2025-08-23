@@ -7,7 +7,6 @@ const ProjectModals = {
         
         // Initialize form and file upload
         this.initializeProjectForm('createProjectForm');
-        this.initializeFileUpload('createProjectForm');
         
         // Handle submit
         DOM.on('createProjectForm', 'submit', async (e) => {
@@ -32,7 +31,6 @@ const ProjectModals = {
         
         // Initialize form and file upload
         this.initializeProjectForm('editProjectForm', project);
-        this.initializeFileUpload('editProjectForm', project.files);
         
         // Handle submit
         DOM.on('editProjectForm', 'submit', async (e) => {
@@ -116,31 +114,15 @@ const ProjectModals = {
                             required>${project?.description || ''}</textarea>
                 </div>
                 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>ZIP Code <span class="text-danger">*</span></label>
-                            <input type="text" 
-                                class="form-control" 
-                                name="zip_code" 
-                                value="${project?.zip_code || ''}"
-                                pattern="[0-9]{5}"
-                                required>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Budget Range</label>
-                            <select class="form-control" name="budget_range">
-                                <option value="">Select Range</option>
-                                <option value="0-5000" ${project?.budget_range === '0-5000' ? 'selected' : ''}>$0 - $5,000</option>
-                                <option value="5000-10000" ${project?.budget_range === '5000-10000' ? 'selected' : ''}>$5,000 - $10,000</option>
-                                <option value="10000-25000" ${project?.budget_range === '10000-25000' ? 'selected' : ''}>$10,000 - $25,000</option>
-                                <option value="25000-50000" ${project?.budget_range === '25000-50000' ? 'selected' : ''}>$25,000 - $50,000</option>
-                                <option value="50000+" ${project?.budget_range === '50000+' ? 'selected' : ''}>$50,000+</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label>ZIP Code <span class="text-danger">*</span></label>
+                    <input type="text" 
+                        class="form-control" 
+                        name="zip_code" 
+                        value="${project?.zip_code || ''}"
+                        pattern="[0-9]{5}"
+                        placeholder="12345"
+                        required>
                 </div>
                 
                 <div class="row">
@@ -162,7 +144,7 @@ const ProjectModals = {
                                 class="form-control" 
                                 name="delivery_date" 
                                 id="deliveryDate"
-                                value="${project?.delivery_date?.split('T')[0] || ''}"
+                                value="${project ? this.formatDateForInput(project.delivery_date, true) : ''}"
                                 required>
                         </div>
                     </div>
@@ -171,25 +153,30 @@ const ProjectModals = {
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Maximum Bid Amount</label>
-                            <input type="number" 
-                                class="form-control" 
-                                name="max_bid" 
-                                value="${project?.max_bid || ''}"
-                                min="0"
-                                step="0.01"
-                                placeholder="Optional">
+                            <label>Maximum Bid (Optional)</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">$</span>
+                                </div>
+                                <input type="number" 
+                                    class="form-control" 
+                                    name="max_bid" 
+                                    value="${project?.max_bid || ''}"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="Leave blank for no limit">
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Show Maximum Bid</label>
-                            <div class="custom-control custom-switch">
+                            <label>&nbsp;</label>
+                            <div class="custom-control custom-checkbox mt-2">
                                 <input type="checkbox" 
                                     class="custom-control-input" 
                                     id="showMaxBid"
                                     name="show_max_bid"
-                                    ${project?.show_max_bid ? 'checked' : ''}>
+                                    ${project?.show_max_bid !== false ? 'checked' : ''}>
                                 <label class="custom-control-label" for="showMaxBid">
                                     Display maximum bid to contractors
                                 </label>
@@ -248,9 +235,9 @@ const ProjectModals = {
                 ${files.map(file => `
                     <div class="file-item existing-file" data-file-id="${file.id}">
                         <div class="file-info">
-                            <i class="fas ${FileUpload.getFileIcon(file.name)}"></i>
-                            <span class="file-name">${file.original_name || file.name}</span>
-                            <span class="file-size">(${Formatter.fileSize(file.size)})</span>
+                            <i class="fas ${FileUpload.getFileIcon(file.original_name || file.file_name)}"></i>
+                            <span class="file-name">${file.original_name || file.file_name}</span>
+                            <span class="file-size">(${Formatter.fileSize(file.file_size || file.size)})</span>
                         </div>
                         <button type="button" 
                                 class="btn-icon btn-danger" 
@@ -422,6 +409,9 @@ const ProjectModals = {
             // Process form data
             const data = this.processProjectFormData(formData);
             
+            // Store start_bidding flag before it's removed
+            const shouldStartBidding = formData.has('start_bidding');
+            
             // Validate
             const validation = this.validateProjectData(data);
             if (!validation.valid) {
@@ -446,7 +436,7 @@ const ProjectModals = {
             }
             
             // Start bidding if requested
-            if (data.start_bidding) {
+            if (shouldStartBidding) {
                 await API.projects.startBidding(project.id);
             }
             
@@ -567,7 +557,6 @@ const ProjectModals = {
         
         // Handle checkboxes
         data.show_max_bid = formData.has('show_max_bid');
-        data.start_bidding = formData.has('start_bidding');
         
         // Handle site conditions array
         const conditions = formData.getAll('site_conditions[]').filter(c => c.trim());
@@ -579,6 +568,10 @@ const ProjectModals = {
         if (!data.max_bid) {
             delete data.max_bid;
         }
+        
+        // Remove fields that don't exist in the database
+        delete data.budget_range;
+        delete data.start_bidding;
         
         return data;
     },
@@ -633,8 +626,27 @@ const ProjectModals = {
         container.insertAdjacentHTML('beforeend', conditionHTML);
     },
     
-    // Format date for input
-    formatDateForInput(dateString) {
+    // Format date for date input (yyyy-MM-dd)
+    formatDateOnly(dateString) {
+        if (!dateString) return '';
+        
+        // Handle if it's already just a date (yyyy-MM-dd)
+        if (dateString.length === 10 && dateString.indexOf('T') === -1) {
+            return dateString;
+        }
+        
+        // Extract just the date part
+        return dateString.split('T')[0];
+    },
+
+    // Format date for datetime-local input (yyyy-MM-ddTHH:mm)
+    formatDateForInput(dateString, dateOnly = false) {
+        if (!dateString) return '';
+        
+        if (dateOnly) {
+            return this.formatDateOnly(dateString);
+        }
+        
         const date = new Date(dateString);
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');

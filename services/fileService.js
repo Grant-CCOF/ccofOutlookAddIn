@@ -55,12 +55,13 @@ class FileService {
                 await fs.rename(file.path, filePath);
             }
             
+            // Return with snake_case property names to match database schema
             return {
-                originalName: file.originalname,
-                fileName: fileName,
-                filePath: filePath,
-                fileSize: file.size,
-                mimeType: file.mimetype
+                original_name: file.originalname,  // Changed from originalName
+                file_name: fileName,                // Changed from fileName
+                file_path: filePath,                // Changed from filePath
+                file_size: file.size,               // Changed from fileSize
+                mime_type: file.mimetype            // Changed from mimeType
             };
         } catch (error) {
             logger.error('Error saving file:', error);

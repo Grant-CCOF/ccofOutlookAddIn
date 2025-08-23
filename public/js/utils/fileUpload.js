@@ -526,6 +526,11 @@ const FileUpload = {
     
     // Get file icon
     getFileIcon(filename) {
+        // Handle undefined or null filename
+        if (!filename) {
+            return 'fa-file';
+        }
+        
         const extension = '.' + filename.split('.').pop().toLowerCase();
         
         const icons = {

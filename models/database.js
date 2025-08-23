@@ -148,21 +148,41 @@ class Database {
 
     async seedDefaultData() {
         try {
-            const adminExists = await this.get('SELECT id FROM users WHERE username = ?', ['admin']);
+            // Check if admin exists by username OR email
+            const adminCheck = await this.get(
+                'SELECT id, username, email FROM users WHERE username = ? OR email = ?', 
+                ['admin', 'admin@capitalchoice.com']
+            );
             
-            if (!adminExists) {
-                const hashedPassword = await bcrypt.hash(process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 10);
+            if (!adminCheck) {
+                // No admin exists, create one
+                const hashedPassword = await bcrypt.hash(
+                    process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 
+                    10
+                );
                 
                 await this.run(
                     `INSERT INTO users (username, password, name, email, role, approved, suspended) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     ['admin', hashedPassword, 'System Administrator', 'admin@capitalchoice.com', 'admin', 1, 0]
                 );
                 
-                logger.info('Default admin user created');
+                logger.info('Default admin user created successfully');
+                logger.info('Login with username: admin, password: admin123');
+            } else {
+                // Admin exists, just log it
+                logger.info(`Admin user already exists (username: ${adminCheck.username}, email: ${adminCheck.email})`);
             }
         } catch (error) {
-            logger.error('Error seeding default data:', error);
+            // Handle the error gracefully without crashing
+            if (error.code === 'SQLITE_CONSTRAINT') {
+                // This is expected if admin already exists
+                logger.info('Admin user already exists in database - skipping creation');
+            } else {
+                // Log other errors but don't crash
+                logger.warn('Non-critical error during data seeding:', error.message);
+            }
+            // Don't throw or reject - let the app continue
         }
     }
 

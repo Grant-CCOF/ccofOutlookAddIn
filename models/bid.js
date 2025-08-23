@@ -76,6 +76,36 @@ class BidModel {
         `;
         return db.all(sql, [projectId]);
     }
+
+    static async getProjectBidStats(projectId) {
+        const sql = `
+            SELECT 
+                COUNT(*) as count,
+                MIN(amount) as min_amount,
+                MAX(amount) as max_amount,
+                AVG(amount) as avg_amount
+            FROM bids 
+            WHERE project_id = ?
+        `;
+        
+        try {
+            const result = await db.get(sql, [projectId]);
+            return {
+                count: result.count || 0,
+                min_amount: result.min_amount || null,
+                max_amount: result.max_amount || null,
+                avg_amount: result.avg_amount || null
+            };
+        } catch (error) {
+            logger.error('Error getting project bid stats:', error);
+            return {
+                count: 0,
+                min_amount: null,
+                max_amount: null,
+                avg_amount: null
+            };
+        }
+    }
     
     static async getUserBidForProject(userId, projectId) {
         const sql = `SELECT * FROM bids WHERE user_id = ? AND project_id = ?`;

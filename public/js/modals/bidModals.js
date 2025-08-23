@@ -166,9 +166,9 @@ const BidModals = {
                 ${files.map(file => `
                     <div class="file-item existing-file" data-file-id="${file.id}">
                         <div class="file-info">
-                            <i class="fas ${FileUpload.getFileIcon(file.name)}"></i>
-                            <span class="file-name">${file.original_name || file.name}</span>
-                            <span class="file-size">(${Formatter.fileSize(file.size)})</span>
+                            <i class="fas ${FileUpload.getFileIcon(file.original_name || file.file_name)}"></i>
+                            <span class="file-name">${file.original_name || file.file_name}</span>
+                            <span class="file-size">(${Formatter.fileSize(file.file_size || file.size)})</span>
                         </div>
                         <button type="button" 
                                 class="btn-icon btn-danger" 
