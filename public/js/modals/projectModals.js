@@ -86,7 +86,7 @@ const ProjectModals = {
         const modal = this.createModal('Award Project', content, {
             size: 'large',
             confirmText: 'Award Project',
-            onConfirm: () => this.handleAwardProject(project.id)
+            onConfirm: `ProjectModals.handleAwardProject(${project.id})`
         });
     },
     
@@ -524,7 +524,8 @@ const ProjectModals = {
             return;
         }
         
-        const bidId = selectedBid.value;
+        // Convert bidId to integer
+        const bidId = parseInt(selectedBid.value, 10);
         const message = DOM.getValue('awardMessage');
         
         if (!confirm('Are you sure you want to award this project? This action cannot be undone.')) {

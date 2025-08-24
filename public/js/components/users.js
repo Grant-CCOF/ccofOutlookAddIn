@@ -815,9 +815,6 @@ const UsersComponent = {
                                     
                                     <dt class="col-sm-3">Joined</dt>
                                     <dd class="col-sm-9">${Formatter.datetime(user.created_at)}</dd>
-                                    
-                                    <dt class="col-sm-3">Last Login</dt>
-                                    <dd class="col-sm-9">${user.last_login ? Formatter.timeAgo(user.last_login) : 'Never'}</dd>
                                 </dl>
                                 
                                 ${stats ? this.renderUserStats(stats, user.role) : ''}

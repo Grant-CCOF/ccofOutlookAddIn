@@ -165,6 +165,7 @@ router.post('/', [
         const bidData = {
             project_id,
             user_id: req.user.id,
+            user_role: req.user.role,
             amount,
             comments,
             alternate_delivery_date,

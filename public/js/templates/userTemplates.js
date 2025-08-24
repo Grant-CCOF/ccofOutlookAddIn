@@ -417,11 +417,6 @@ const UserTemplates = {
                         
                         <dt><i class="fas fa-calendar"></i> Member Since</dt>
                         <dd>${Formatter.date(user.created_at)}</dd>
-                        
-                        ${user.last_login ? `
-                            <dt><i class="fas fa-clock"></i> Last Seen</dt>
-                            <dd>${Formatter.timeAgo(user.last_login)}</dd>
-                        ` : ''}
                     </dl>
                 </div>
             </div>

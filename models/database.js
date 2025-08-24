@@ -105,11 +105,13 @@ class Database {
                 comments TEXT,
                 alternate_delivery_date DATE,
                 status TEXT DEFAULT 'pending',
+                bid_number INTEGER DEFAULT 1,
+                is_test_bid INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (project_id) REFERENCES projects(id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
-                UNIQUE(project_id, user_id)
+                UNIQUE(project_id, user_id, bid_number)
             )`,
             
             `CREATE TABLE IF NOT EXISTS notifications (

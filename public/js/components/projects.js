@@ -274,7 +274,7 @@ const ProjectsComponent = {
                 
                 <div class="project-card-footer">
                     <div class="project-card-meta">
-                        <i class="fas fa-user"></i> ${project.manager_name || 'Unknown'}
+                        <i class="fas fa-user"></i> ${project.project_manager_name || 'Unknown'}
                     </div>
                     
                     <div class="project-card-actions">
@@ -410,6 +410,14 @@ const ProjectsComponent = {
                 // Explicitly don't load bids for installation companies
                 project.bids = null;
             }
+
+            // Load project files
+            try {
+                project.files = await API.files.getProjectFiles(projectId);
+            } catch (error) {
+                console.error('Failed to load project files:', error);
+                project.files = [];
+            }
             
             const content = this.renderProjectDetail(project);
             DOM.setHTML('pageContent', content);
@@ -448,7 +456,7 @@ const ProjectsComponent = {
                                         <i class="fas ${status.icon}"></i> ${status.label}
                                     </span>
                                     <span class="text-muted ml-3">
-                                        <i class="fas fa-user"></i> ${project.manager_name}
+                                        <i class="fas fa-user"></i> ${project.project_manager_name}
                                     </span>
                                     <span class="text-muted ml-3">
                                         <i class="fas fa-calendar"></i> Created ${Formatter.date(project.created_at)}
@@ -644,7 +652,7 @@ const ProjectsComponent = {
                     ${project.status === 'bidding' ? `
                         <p class="text-muted">
                             <i class="fas fa-clock"></i> 
-                            Bidding closes on ${new Date(project.bid_due_date).toLocaleDateString()}
+                            Bidding closes on ${Formatter.date(project.bid_due_date)}
                         </p>
                     ` : ''}
                 </div>
@@ -661,7 +669,7 @@ const ProjectsComponent = {
                 ${project.status === 'bidding' ? `
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-info-circle"></i>
-                        Bidding is open until ${new Date(project.bid_due_date).toLocaleDateString()}
+                        Bidding is open until ${Formatter.date(project.bid_due_date)}
                     </div>
                 ` : ''}
                 
@@ -693,11 +701,22 @@ const ProjectsComponent = {
         const isAdmin = userRole === 'admin';
         const isProjectManager = userRole === 'project_manager';
         
+        // Add test bid indicator
+        const testBidIndicator = bid.is_test_bid ? 
+            '<span class="badge badge-info ml-2">TEST</span>' : '';
+        const bidNumberIndicator = bid.bid_number > 1 ? 
+            `<span class="badge badge-secondary ml-2">#${bid.bid_number}</span>` : '';
+
         // Format delivery date
         let deliveryDateDisplay = '<span class="text-muted">No change</span>';
         if (bid.alternate_delivery_date) {
+            // Normalize dates to compare only the date portion (not time)
             const altDate = new Date(bid.alternate_delivery_date);
             const projDate = new Date(project.delivery_date);
+            
+            // Set both dates to midnight to ensure proper comparison
+            altDate.setHours(0, 0, 0, 0);
+            projDate.setHours(0, 0, 0, 0);
             
             if (altDate.getTime() !== projDate.getTime()) {
                 const daysDiff = Math.floor((altDate - projDate) / (1000 * 60 * 60 * 24));
@@ -716,6 +735,8 @@ const ProjectsComponent = {
             <tr class="${bid.status === 'won' ? 'table-success' : ''}">
                 <td>
                     <strong>${bid.bidder_display || bid.user_name || 'Unknown'}</strong>
+                    ${testBidIndicator}
+                    ${bidNumberIndicator}
                 </td>
                 <td>
                     ${bid.company || '<span class="text-muted">-</span>'}
@@ -967,8 +988,30 @@ const ProjectsComponent = {
     },
     
     async showAwardModal(projectId) {
-        const project = await API.projects.getById(projectId);
-        ProjectModals.showAwardModal(project);
+        try {
+            // Load fresh project data with bids
+            const project = await API.projects.getById(projectId);
+            
+            // Check status first
+            if (project.status !== 'reviewing') {
+                App.showError('Please close bidding first before awarding the project');
+                return;
+            }
+            
+            // Load bids if not present
+            if (!project.bids) {
+                project.bids = await API.bids.getProjectBids(projectId);
+            }
+            
+            if (!project.bids || project.bids.length === 0) {
+                App.showError('No bids available to award');
+                return;
+            }
+            
+            ProjectModals.showAwardModal(project);
+        } catch (error) {
+            App.showError('Failed to load project for awarding');
+        }
     },
     
     async markComplete(projectId) {

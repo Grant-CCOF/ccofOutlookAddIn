@@ -279,7 +279,7 @@ API.projects = {
     update: (id, data) => API.put(`/projects/${id}`, data),
     delete: (id) => API.delete(`/projects/${id}`),
     startBidding: (id) => API.post(`/projects/${id}/start-bidding`),
-    award: (id, bidId) => API.post(`/projects/${id}/award`, { bidId }),
+    award: (id, data) => API.post(`/projects/${id}/award`, { bidId: parseInt(data.bidId, 10) }),
     complete: (id) => API.post(`/projects/${id}/complete`)
 };
 

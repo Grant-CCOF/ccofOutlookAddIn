@@ -52,7 +52,16 @@ const Formatter = {
     date(date, format = 'MM/DD/YYYY') {
         if (!date) return '';
         
-        const d = new Date(date);
+        // Fix timezone issue - treat date strings as local time, not UTC
+        let d;
+        if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            // For date-only strings (YYYY-MM-DD), parse as local time
+            const [year, month, day] = date.split('-').map(num => parseInt(num, 10));
+            d = new Date(year, month - 1, day); // month is 0-based in JS
+        } else {
+            d = new Date(date);
+        }
+        
         if (isNaN(d.getTime())) return '';
         
         const month = String(d.getMonth() + 1).padStart(2, '0');

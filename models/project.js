@@ -93,8 +93,12 @@ class ProjectModel {
     
     static async getByManager(managerId) {
         const sql = `
-            SELECT p.*, COUNT(DISTINCT b.id) as bid_count
+            SELECT p.*, 
+                u.name as project_manager_name,
+                u.email as project_manager_email,
+                COUNT(DISTINCT b.id) as bid_count
             FROM projects p
+            LEFT JOIN users u ON p.project_manager_id = u.id
             LEFT JOIN bids b ON p.id = b.project_id
             WHERE p.project_manager_id = ?
             GROUP BY p.id

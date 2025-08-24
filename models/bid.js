@@ -3,9 +3,26 @@ const logger = require('../utils/logger');
 
 class BidModel {
     static async create(bidData) {
+        // For admin test bids, find the next bid number
+        let bidNumber = 1;
+        let isTestBid = 0;
+        
+        if (bidData.user_role === 'admin') {
+            isTestBid = 1;
+            // Get the highest bid number for this user/project combination
+            const existingBids = await db.get(
+                'SELECT MAX(bid_number) as max_num FROM bids WHERE user_id = ? AND project_id = ?',
+                [bidData.user_id, bidData.project_id]
+            );
+            
+            if (existingBids && existingBids.max_num) {
+                bidNumber = existingBids.max_num + 1;
+            }
+        }
+        
         const sql = `
-            INSERT INTO bids (project_id, user_id, amount, comments, alternate_delivery_date, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO bids (project_id, user_id, amount, comments, alternate_delivery_date, status, bid_number, is_test_bid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
@@ -14,7 +31,9 @@ class BidModel {
             bidData.amount,
             bidData.comments || null,
             bidData.alternate_delivery_date || null,
-            bidData.status || 'pending'
+            bidData.status || 'pending',
+            bidNumber,
+            isTestBid
         ];
         
         try {
@@ -27,17 +46,19 @@ class BidModel {
     }
 
     // Get a specific user's bid for a project
-    static async getUserBidForProject(userId, projectId) {
-        const query = `
-            SELECT b.*, u.name as user_name, u.company_name as company
-            FROM bids b
-            JOIN users u ON b.user_id = u.id
-            WHERE b.user_id = ? AND b.project_id = ?
-            LIMIT 1
+    static async getUserBidForProject(userId, projectId, includeTestBids = false) {
+        let sql = `
+            SELECT * FROM bids 
+            WHERE user_id = ? AND project_id = ?
         `;
         
-        const [rows] = await db.query(query, [userId, projectId]);
-        return rows[0] || null;
+        if (!includeTestBids) {
+            sql += ' AND is_test_bid = 0';
+        }
+        
+        sql += ' ORDER BY bid_number DESC LIMIT 1';
+        
+        return db.get(sql, [userId, projectId]);
     }
     
     static async getById(id) {
