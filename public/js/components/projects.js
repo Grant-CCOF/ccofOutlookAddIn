@@ -30,9 +30,6 @@ const ProjectsComponent = {
                     <button class="btn btn-primary" onclick="ProjectsComponent.showCreateModal()">
                         <i class="fas fa-plus"></i> New Project
                     </button>
-                    <button class="btn btn-outline" onclick="ProjectsComponent.exportProjects()">
-                        <i class="fas fa-download"></i> Export
-                    </button>
                 `);
             } else {
                 DOM.setHTML('pageActions', `
@@ -718,32 +715,25 @@ const ProjectsComponent = {
         return `
             <tr class="${bid.status === 'won' ? 'table-success' : ''}">
                 <td>
-                    <strong>${bid.bidder_display || bid.user_name || bid.company || 'Unknown'}</strong>
-                    ${bid.company ? `<br><small class="text-muted">${bid.company}</small>` : ''}
+                    <strong>${bid.bidder_display || bid.user_name || 'Unknown'}</strong>
+                </td>
+                <td>
+                    ${bid.company || '<span class="text-muted">-</span>'}
+                </td>
+                <td>
+                    ${bid.rating ? this.getRatingStars(bid.rating) : '<span class="text-muted">No rating</span>'}
                 </td>
                 <td>
                     <span class="h5 mb-0">${Formatter.currency(bid.amount)}</span>
                 </td>
                 <td>${deliveryDateDisplay}</td>
                 <td>
-                    ${bid.comments ? `
-                        <span class="text-truncate" style="max-width: 200px; display: inline-block;">
-                            ${bid.comments}
-                        </span>
-                    ` : '<span class="text-muted">-</span>'}
+                    ${Formatter.timeAgo(bid.created_at)}
                 </td>
                 <td>
                     <span class="badge badge-${this.getBidStatusClass(bid.status)}">
                         ${bid.status.toUpperCase()}
                     </span>
-                </td>
-                <td>
-                    ${bid.files && bid.files.length > 0 ? `
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="ProjectsComponent.showBidFiles(${bid.id})">
-                            <i class="fas fa-paperclip"></i> ${bid.files.length}
-                        </button>
-                    ` : '<span class="text-muted">None</span>'}
                 </td>
                 ${(isAdmin || isProjectManager) && project.status === 'reviewing' ? `
                     <td>
@@ -756,6 +746,39 @@ const ProjectsComponent = {
                 ` : ''}
             </tr>
         `;
+    },  
+
+    getBidStatusClass(status) {
+        const statusClasses = {
+            'pending': 'secondary',
+            'submitted': 'info',
+            'reviewing': 'warning',
+            'won': 'success',
+            'lost': 'danger',
+            'withdrawn': 'dark'
+        };
+        return statusClasses[status] || 'secondary';
+    },
+
+    async showBidFiles(bidId) {
+        try {
+            const bid = await API.bids.getById(bidId);
+            const filesHtml = bid.files && bid.files.length > 0 
+                ? bid.files.map(file => this.renderFileItem(file)).join('')
+                : '<p class="text-muted">No files attached to this bid.</p>';
+            
+            Modals.show('Bid Files', `
+                <div class="bid-files-container">
+                    ${filesHtml}
+                </div>
+            `, {
+                size: 'large',
+                confirmText: 'Close',
+                showCancel: false
+            });
+        } catch (error) {
+            App.showError('Failed to load bid files');
+        }
     },
 
     getRatingStars(rating) {
