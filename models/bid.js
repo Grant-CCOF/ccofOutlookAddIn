@@ -42,13 +42,22 @@ class BidModel {
     
     static async getById(id) {
         const sql = `
-            SELECT b.*, p.title as project_title, u.name as company_name, u.email as user_email
+            SELECT b.*, 
+                u.name as user_name, 
+                u.username as username,
+                u.company as company
             FROM bids b
-            LEFT JOIN projects p ON b.project_id = p.id
             LEFT JOIN users u ON b.user_id = u.id
             WHERE b.id = ?
         `;
-        return db.get(sql, [id]);
+        
+        const bid = await db.get(sql, [id]);
+        
+        if (bid) {
+            bid.bidder_display = bid.user_name || bid.username || bid.company || 'Unknown Bidder';
+        }
+        
+        return bid;
     }
     
     static async getUserBids(userId) {
@@ -65,16 +74,24 @@ class BidModel {
     
     static async getProjectBids(projectId) {
         const sql = `
-            SELECT b.*, u.name as company_name, u.email as user_email, u.phone as user_phone,
-                   AVG((r.price + r.speed + r.quality + r.responsiveness + r.customer_satisfaction) / 5.0) as avg_rating
+            SELECT b.*, 
+                u.name as user_name, 
+                u.username as username,
+                u.company as company, 
+                u.email as user_email
             FROM bids b
             LEFT JOIN users u ON b.user_id = u.id
-            LEFT JOIN ratings r ON u.id = r.rated_user_id
             WHERE b.project_id = ?
-            GROUP BY b.id
             ORDER BY b.amount ASC
         `;
-        return db.all(sql, [projectId]);
+        
+        const bids = await db.all(sql, [projectId]);
+        
+        // Format bidder display name for each bid
+        return bids.map(bid => ({
+            ...bid,
+            bidder_display: bid.user_name || bid.username || bid.company || 'Unknown Bidder'
+        }));
     }
 
     static async getProjectBidStats(projectId) {

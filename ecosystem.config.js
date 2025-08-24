@@ -3,8 +3,8 @@ module.exports = {
       name: 'capital-choice-platform',
       script: './server.js',
       cwd: '/opt/capital-choice-platform',
-      instances: 'max',
-      exec_mode: 'cluster',
+      instances: '1',
+      exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
         PORT: 3000

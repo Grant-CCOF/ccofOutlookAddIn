@@ -691,52 +691,61 @@ const ProjectsComponent = {
         `;
     },
 
-    renderBidRow(bid, project, canAcceptBids) {
-        // Determine bid status
-        let statusBadge = '';
-        if (project.awarded_to === bid.user_id) {
-            statusBadge = '<span class="badge badge-success">Won</span>';
-        } else if (project.status === 'awarded' || project.status === 'completed') {
-            statusBadge = '<span class="badge badge-secondary">Lost</span>';
-        } else if (project.status === 'reviewing') {
-            statusBadge = '<span class="badge badge-warning">Under Review</span>';
-        } else {
-            statusBadge = '<span class="badge badge-info">Pending</span>';
+    renderBidRow(bid, project) {
+        const userRole = State.getUserRole();
+        const isAdmin = userRole === 'admin';
+        const isProjectManager = userRole === 'project_manager';
+        
+        // Format delivery date
+        let deliveryDateDisplay = '<span class="text-muted">No change</span>';
+        if (bid.alternate_delivery_date) {
+            const altDate = new Date(bid.alternate_delivery_date);
+            const projDate = new Date(project.delivery_date);
+            
+            if (altDate.getTime() !== projDate.getTime()) {
+                const daysDiff = Math.floor((altDate - projDate) / (1000 * 60 * 60 * 24));
+                const earlier = daysDiff < 0;
+                
+                deliveryDateDisplay = `
+                    <span class="text-${earlier ? 'success' : 'warning'}">
+                        ${Formatter.date(bid.alternate_delivery_date)}
+                        <small class="d-block">(${Math.abs(daysDiff)} days ${earlier ? 'earlier' : 'later'})</small>
+                    </span>
+                `;
+            }
         }
-
-        // Get company rating (would come from bid.company_rating in real implementation)
-        const rating = bid.company_rating || bid.user_rating || 0;
-        const ratingStars = this.getRatingStars(rating);
-
+        
         return `
-            <tr class="bid-row" data-bid-id="${bid.id}">
+            <tr class="${bid.status === 'won' ? 'table-success' : ''}">
                 <td>
-                    <div class="d-flex align-items-center">
-                        <img src="${bid.user_avatar || '/images/default-avatar.png'}" 
-                             class="rounded-circle mr-2" 
-                             style="width: 32px; height: 32px; object-fit: cover;"
-                             alt="${bid.user_name}">
-                        <span>${bid.user_name}</span>
-                    </div>
+                    <strong>${bid.bidder_display || bid.user_name || bid.company || 'Unknown'}</strong>
+                    ${bid.company ? `<br><small class="text-muted">${bid.company}</small>` : ''}
                 </td>
-                <td>${bid.company || '-'}</td>
                 <td>
-                    <div class="rating-display">
-                        ${ratingStars}
-                        <small class="text-muted ml-1">(${rating.toFixed(1)})</small>
-                    </div>
+                    <span class="h5 mb-0">${Formatter.currency(bid.amount)}</span>
                 </td>
-                <td class="font-weight-bold text-primary">
-                    ${Formatter.currency(bid.amount)}
-                </td>
-                <td>${new Date(bid.delivery_date).toLocaleDateString()}</td>
+                <td>${deliveryDateDisplay}</td>
                 <td>
-                    <small class="text-muted">
-                        ${Formatter.timeAgo(bid.created_at)}
-                    </small>
+                    ${bid.comments ? `
+                        <span class="text-truncate" style="max-width: 200px; display: inline-block;">
+                            ${bid.comments}
+                        </span>
+                    ` : '<span class="text-muted">-</span>'}
                 </td>
-                <td>${statusBadge}</td>
-                ${canAcceptBids ? `
+                <td>
+                    <span class="badge badge-${this.getBidStatusClass(bid.status)}">
+                        ${bid.status.toUpperCase()}
+                    </span>
+                </td>
+                <td>
+                    ${bid.files && bid.files.length > 0 ? `
+                        <button class="btn btn-sm btn-outline-info" 
+                                onclick="ProjectsComponent.showBidFiles(${bid.id})">
+                            <i class="fas fa-paperclip"></i> ${bid.files.length}
+                        </button>
+                    ` : '<span class="text-muted">None</span>'}
+                </td>
+                ${(isAdmin || isProjectManager) && project.status === 'reviewing' ? `
                     <td>
                         <button class="btn btn-sm btn-success" 
                                 onclick="ProjectsComponent.acceptBid(${project.id}, ${bid.id})"

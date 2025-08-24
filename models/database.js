@@ -7,18 +7,48 @@ class Database {
     constructor() {
         this.db = null;
         this.dbPath = path.join(__dirname, '..', process.env.DATABASE_PATH || 'database.sqlite');
+        this.initializePromise = null; // Track initialization state
     }
 
     async initialize() {
+        // Prevent double initialization
+        if (this.initializePromise) {
+            logger.info('Database initialization already in progress, waiting...');
+            return this.initializePromise;
+        }
+
+        // Create and store the initialization promise
+        this.initializePromise = this._doInitialize();
+        return this.initializePromise;
+    }
+
+    async _doInitialize() {
+        try {
+            // First, open the database connection
+            await this._openDatabase();
+            
+            // Then create tables
+            await this.createTables();
+            
+            // Finally seed data
+            await this.seedDefaultData();
+            
+            logger.info('Database initialization completed successfully');
+        } catch (error) {
+            logger.error('Database initialization failed:', error);
+            this.initializePromise = null; // Reset so it can be retried
+            throw error;
+        }
+    }
+
+    _openDatabase() {
         return new Promise((resolve, reject) => {
-            this.db = new sqlite3.Database(this.dbPath, async (err) => {
+            this.db = new sqlite3.Database(this.dbPath, (err) => {
                 if (err) {
                     logger.error('Error opening database:', err);
                     reject(err);
                 } else {
                     logger.info('Connected to SQLite database');
-                    await this.createTables();
-                    await this.seedDefaultData();
                     resolve();
                 }
             });
@@ -148,41 +178,51 @@ class Database {
 
     async seedDefaultData() {
         try {
-            // Check if admin exists by username OR email
-            const adminCheck = await this.get(
-                'SELECT id, username, email FROM users WHERE username = ? OR email = ?', 
-                ['admin', 'admin@capitalchoice.com']
-            );
+            logger.info('Starting seed data process...');
             
-            if (!adminCheck) {
-                // No admin exists, create one
-                const hashedPassword = await bcrypt.hash(
-                    process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 
-                    10
+            // Use a transaction to ensure atomicity
+            await this.run('BEGIN TRANSACTION');
+            
+            try {
+                // Check if admin exists by username OR email
+                const adminCheck = await this.get(
+                    'SELECT id, username, email FROM users WHERE username = ? OR email = ?', 
+                    ['admin', 'admin@capitalchoice.com']
                 );
                 
-                await this.run(
-                    `INSERT INTO users (username, password, name, email, role, approved, suspended) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    ['admin', hashedPassword, 'System Administrator', 'admin@capitalchoice.com', 'admin', 1, 0]
-                );
+                if (!adminCheck) {
+                    logger.info('No admin user found, creating default admin...');
+                    
+                    const hashedPassword = await bcrypt.hash(
+                        process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 
+                        10
+                    );
+                    
+                    await this.run(
+                        `INSERT INTO users (username, password, name, email, role, approved, suspended) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        ['admin', hashedPassword, 'System Administrator', 'admin@capitalchoice.com', 'admin', 1, 0]
+                    );
+                    
+                    logger.info('Default admin user created successfully');
+                    logger.info('Login with username: admin, password: admin123');
+                } else {
+                    logger.info(`Admin user already exists (username: ${adminCheck.username}, email: ${adminCheck.email})`);
+                }
                 
-                logger.info('Default admin user created successfully');
-                logger.info('Login with username: admin, password: admin123');
-            } else {
-                // Admin exists, just log it
-                logger.info(`Admin user already exists (username: ${adminCheck.username}, email: ${adminCheck.email})`);
+                await this.run('COMMIT');
+                
+            } catch (error) {
+                await this.run('ROLLBACK');
+                throw error;
             }
+            
         } catch (error) {
-            // Handle the error gracefully without crashing
             if (error.code === 'SQLITE_CONSTRAINT') {
-                // This is expected if admin already exists
                 logger.info('Admin user already exists in database - skipping creation');
             } else {
-                // Log other errors but don't crash
                 logger.warn('Non-critical error during data seeding:', error.message);
             }
-            // Don't throw or reject - let the app continue
         }
     }
 
@@ -191,6 +231,7 @@ class Database {
             this.db.run(sql, params, function(err) {
                 if (err) {
                     logger.error('Database run error:', err);
+                    logger.error('Stack trace:', new Error().stack);
                     reject(err);
                 } else {
                     resolve({ id: this.lastID, changes: this.changes });
@@ -227,12 +268,19 @@ class Database {
 
     close() {
         return new Promise((resolve, reject) => {
+            if (!this.db) {
+                resolve();
+                return;
+            }
+            
             this.db.close((err) => {
                 if (err) {
                     logger.error('Error closing database:', err);
                     reject(err);
                 } else {
                     logger.info('Database connection closed');
+                    this.db = null;
+                    this.initializePromise = null;
                     resolve();
                 }
             });

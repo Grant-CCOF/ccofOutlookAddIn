@@ -130,47 +130,52 @@ const BidTemplates = {
     },
     
     // Get bid row for table
-    getBidRow(bid) {
-        const statusColor = this.getBidStatusColor(bid.status);
-        const project = bid.project || {};
+    getBidRow(bid, project) {
+        const deliveryDateDisplay = this.formatBidDeliveryDate(bid.alternate_delivery_date, project.delivery_date);
         
         return `
-            <tr data-bid-id="${bid.id}">
+            <tr>
+                <td>${bid.bidder_display || bid.user_name || bid.company || 'Unknown'}</td>
+                <td>${Formatter.currency(bid.amount)}</td>
+                <td>${deliveryDateDisplay}</td>
+                <td>${bid.comments || '-'}</td>
                 <td>
-                    <div class="project-info">
-                        <strong>${project.title || 'Project #' + bid.project_id}</strong>
-                        <small class="text-muted d-block">${project.zip_code || 'N/A'}</small>
-                    </div>
+                    <span class="badge badge-${this.getStatusClass(bid.status)}">
+                        ${bid.status}
+                    </span>
                 </td>
-                <td>${bid.company_name || '-'}</td>
-                <td class="font-weight-bold">${Formatter.currency(bid.amount)}</td>
-                <td>${Formatter.date(bid.alternate_delivery_date || project.delivery_date)}</td>
+                <td>${Formatter.date(bid.created_at)}</td>
                 <td>
-                    <span class="badge badge-${statusColor}">${bid.status}</span>
-                </td>
-                <td>${Formatter.timeAgo(bid.created_at)}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline" 
-                                onclick="BidsComponent.viewBidDetails(${bid.id})"
-                                title="View Details">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        ${bid.status === 'pending' && Auth.hasRole(['installation_company', 'operations']) ? `
-                            <button class="btn btn-outline" 
-                                    onclick="BidsComponent.editBid(${bid.id})"
-                                    title="Edit Bid">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline text-danger" 
-                                    onclick="BidsComponent.withdrawBid(${bid.id})"
-                                    title="Withdraw Bid">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        ` : ''}
-                    </div>
+                    <button class="btn btn-sm btn-info" onclick="BidsComponent.viewBidDetails(${bid.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${this.getBidActions(bid)}
                 </td>
             </tr>
+        `;
+    },
+
+    formatBidDeliveryDate(alternateDate, projectDate) {
+        if (!alternateDate || alternateDate === null || alternateDate === '') {
+            return '<span class="text-muted">No change</span>';
+        }
+        
+        const altDate = new Date(alternateDate);
+        const projDate = new Date(projectDate);
+        
+        if (altDate.getTime() === projDate.getTime()) {
+            return '<span class="text-muted">No change</span>';
+        }
+        
+        const daysDiff = Math.floor((altDate - projDate) / (1000 * 60 * 60 * 24));
+        const earlier = daysDiff < 0;
+        
+        return `
+            <span class="text-${earlier ? 'success' : 'warning'}">
+                ${Formatter.date(alternateDate)}
+                <br>
+                <small>(${Math.abs(daysDiff)} days ${earlier ? 'earlier' : 'later'})</small>
+            </span>
         `;
     },
     

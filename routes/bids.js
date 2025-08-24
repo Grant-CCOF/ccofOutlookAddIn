@@ -39,24 +39,23 @@ router.get('/my-bids', [
             project_id
         });
         
-        // For each bid, only include limited project information
-        const bidsWithProjectInfo = await Promise.all(bids.map(async (bid) => {
-            const project = await ProjectModel.getById(bid.project_id);
-            return {
-                ...bid,
-                project_title: project.title,
-                project_status: project.status,
-                project_zip: project.zip_code,
-                // Don't include other bidders' information
-                total_bids: null, // Hide total number of competing bids
-                lowest_bid: null, // Hide lowest bid amount
-                highest_bid: null // Hide highest bid amount
-            };
+        // Add files to each bid
+        const bidsWithFiles = await Promise.all(bids.map(async (bid) => {
+            try {
+                bid.files = await FileModel.getBidFiles(bid.id);
+                // For each bid, only include limited project information
+                const project = await ProjectModel.getById(bid.project_id);
+                bid.project_title = project.title;
+                bid.project_delivery_date = project.delivery_date;
+            } catch (error) {
+                bid.files = [];
+            }
+            return bid;
         }));
         
         logger.info(`User bids retrieved for ${req.user.username}`);
         
-        res.json(bidsWithProjectInfo);
+        res.json(bidsWithFiles);
     } catch (error) {
         logger.error('Error fetching user bids:', error);
         res.status(500).json({ error: 'Failed to fetch bids' });
@@ -109,7 +108,17 @@ router.get('/project/:projectId', [
         
         logger.info(`Bids retrieved for project ${req.params.projectId} by ${req.user.username}`);
         
-        res.json(bids);
+        // Add files to each bid
+        const bidsWithFiles = await Promise.all(bids.map(async (bid) => {
+            try {
+                bid.files = await FileModel.getBidFiles(bid.id);
+            } catch (error) {
+                bid.files = [];
+            }
+            return bid;
+        }));
+
+        res.json(bidsWithFiles);
     } catch (error) {
         logger.error('Error fetching project bids:', error);
         res.status(500).json({ error: 'Failed to fetch bids' });
@@ -166,11 +175,12 @@ router.post('/', [
         const newBid = await BidModel.getById(bidId);
         
         // Notify project manager
-        await NotificationService.notify(
+        await NotificationService.notifyUser(
             project.project_manager_id,
             'New Bid Received',
             `New bid submitted for project "${project.title}"`,
-            { projectId: project_id, bidId }
+            'new_bid',
+            { projectId: project_id, bidId: bidId }
         );
         
         logger.info(`Bid submitted: Project ${project_id} by user ${req.user.id}`);

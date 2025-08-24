@@ -37,18 +37,34 @@ class ProjectModel {
     
     static async getById(id) {
         const sql = `
-            SELECT p.*, u.name as project_manager_name, u.email as project_manager_email,
-                   aw.name as awarded_to_name, aw.company as awarded_to_company
+            SELECT p.*, 
+                u.name as project_manager_name, 
+                u.username as project_manager_username,
+                u.email as project_manager_email,
+                u.company as project_manager_company,
+                aw.name as awarded_to_name, 
+                aw.company as awarded_to_company
             FROM projects p
             LEFT JOIN users u ON p.project_manager_id = u.id
             LEFT JOIN users aw ON p.awarded_to = aw.id
             WHERE p.id = ?
         `;
+        
         const project = await db.get(sql, [id]);
         
         if (project) {
-            if (project.site_conditions) project.site_conditions = JSON.parse(project.site_conditions);
-            if (project.custom_fields) project.custom_fields = JSON.parse(project.custom_fields);
+            // Parse JSON fields
+            if (project.site_conditions) {
+                project.site_conditions = JSON.parse(project.site_conditions);
+            }
+            if (project.custom_fields) {
+                project.custom_fields = JSON.parse(project.custom_fields);
+            }
+            
+            // Format the submitter display name
+            project.submitter_display = project.project_manager_name || 
+                                    project.project_manager_username || 
+                                    'Unknown';
         }
         
         return project;

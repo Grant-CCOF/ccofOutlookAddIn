@@ -310,18 +310,34 @@ const BidModals = {
     },
     
     // Handle create bid with file upload
-    async handleCreateBid(projectId) {
+   async handleCreateBid(projectId) {
         try {
             const form = DOM.get('createBidForm');
             const formData = new FormData(form);
             
-            // Process form data
+            // Process form data - ENSURE project_id is an integer
             const data = {
-                project_id: projectId,
+                project_id: parseInt(projectId, 10),  // Convert to integer
                 amount: parseFloat(formData.get('amount')),
                 alternate_delivery_date: formData.get('alternate_delivery_date') || null,
-                comments: formData.get('comments')
+                comments: formData.get('comments') || ''  // Ensure it's a string, not null
             };
+            
+            // Additional validation to catch issues early
+            if (isNaN(data.project_id)) {
+                App.showError('Invalid project ID');
+                return;
+            }
+            
+            if (isNaN(data.amount)) {
+                App.showError('Invalid bid amount');
+                return;
+            }
+            
+            // Clean up the alternate_delivery_date - send empty string instead of null if not set
+            if (!data.alternate_delivery_date || data.alternate_delivery_date === '') {
+                delete data.alternate_delivery_date;  // Remove from object if empty
+            }
             
             // Validate
             const validation = this.validateBidData(data);
@@ -366,7 +382,20 @@ const BidModals = {
             
         } catch (error) {
             console.error('Error submitting bid:', error);
-            App.showError(error.message || 'Failed to submit bid');
+            
+            // More detailed error handling
+            if (error.response && error.response.data) {
+                const errorData = error.response.data;
+                if (errorData.errors && Array.isArray(errorData.errors)) {
+                    // Express-validator returns an array of errors
+                    const errorMessages = errorData.errors.map(e => e.msg || e.message).join(', ');
+                    App.showError(`Validation failed: ${errorMessages}`);
+                } else {
+                    App.showError(errorData.error || errorData.message || 'Failed to submit bid');
+                }
+            } else {
+                App.showError(error.message || 'Failed to submit bid');
+            }
         } finally {
             App.showLoading(false);
         }

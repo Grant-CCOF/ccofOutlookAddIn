@@ -541,10 +541,11 @@ const App = {
     }
 };
 
+// App is initialized in index.html
 // Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    App.init();
-});
+// document.addEventListener('DOMContentLoaded', () => {
+//     App.init();
+// });
 
 // Handle page visibility changes (for socket reconnection)
 document.addEventListener('visibilitychange', () => {

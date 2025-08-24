@@ -549,6 +549,107 @@ const BidsComponent = {
     // Refresh bids
     async refreshBids() {
         await this.loadBids();
+    },
+
+    // ADD this method to render bid details with files:
+    renderBidWithFiles(bid) {
+        const hasFiles = bid.files && bid.files.length > 0;
+        const bidId = bid.id;
+        
+        return `
+            <div class="bid-card card mb-3">
+                <div class="card-body">
+                    <!-- Main bid information -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5>${bid.project_title || 'Project #' + bid.project_id}</h5>
+                            <p class="mb-2">
+                                <strong>Bid Amount:</strong> ${Formatter.currency(bid.amount)}<br>
+                                <strong>Status:</strong> <span class="badge badge-${this.getStatusBadgeClass(bid.status)}">${bid.status}</span><br>
+                                <strong>Submitted:</strong> ${Formatter.date(bid.created_at)}<br>
+                                <strong>Delivery Date:</strong> ${this.formatDeliveryDate(bid.alternate_delivery_date, bid.project_delivery_date)}
+                            </p>
+                            ${bid.comments ? `
+                                <p class="mb-2"><strong>Comments:</strong> ${bid.comments}</p>
+                            ` : ''}
+                        </div>
+                        <div class="col-md-4 text-right">
+                            <button class="btn btn-primary btn-sm" onclick="BidsComponent.viewBidDetails(${bidId})">
+                                <i class="fas fa-eye"></i> View Details
+                            </button>
+                            ${bid.status === 'pending' ? `
+                                <button class="btn btn-warning btn-sm ml-2" onclick="BidsComponent.editBid(${bidId})">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="btn btn-danger btn-sm ml-2" onclick="BidsComponent.withdrawBid(${bidId})">
+                                    <i class="fas fa-times"></i> Withdraw
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Files dropdown section -->
+                    ${hasFiles ? `
+                        <div class="bid-files-section mt-3">
+                            <button class="btn btn-outline-secondary btn-sm" 
+                                    type="button" 
+                                    data-toggle="collapse" 
+                                    data-target="#bidFiles${bidId}"
+                                    onclick="this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-up');">
+                                <i class="fas fa-chevron-down"></i> 
+                                Attachments (${bid.files.length})
+                            </button>
+                            <div class="collapse mt-2" id="bidFiles${bidId}">
+                                <div class="card card-body">
+                                    ${this.renderBidFiles(bid.files)}
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bid-files-section mt-3">
+                            <p class="text-muted mb-0">
+                                <i class="fas fa-paperclip"></i> No files uploaded with this bid
+                            </p>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    },
+
+    // ADD method to format delivery date:
+    formatDeliveryDate(alternateDate, projectDate) {
+        if (!alternateDate || alternateDate === null || alternateDate === '') {
+            return `<span class="text-muted">No change (${Formatter.date(projectDate)})</span>`;
+        }
+        return `<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> ${Formatter.date(alternateDate)} (Alternate)</span>`;
+    },
+
+    // ADD method to render bid files:
+    renderBidFiles(files) {
+        if (!files || files.length === 0) {
+            return '<p class="text-muted mb-0">No files attached</p>';
+        }
+        
+        return `
+            <div class="bid-files-list">
+                ${files.map(file => `
+                    <div class="bid-file-item d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <i class="fas ${this.getFileIcon(file.original_name || file.name)} mr-2"></i>
+                            <span>${file.original_name || file.name}</span>
+                            <small class="text-muted ml-2">(${this.formatFileSize(file.size || file.file_size)})</small>
+                        </div>
+                        <a href="${API.files.download(file.id)}" 
+                        class="btn btn-sm btn-primary" 
+                        target="_blank"
+                        download="${file.original_name || file.name}">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 };
 

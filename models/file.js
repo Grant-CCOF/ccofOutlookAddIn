@@ -61,6 +61,44 @@ class FileModel {
         `;
         return db.all(sql, [bidId]);
     }
+
+    static async getProjectFiles(projectId) {
+        const sql = `
+            SELECT f.*, 
+                u.name as uploaded_by_name,
+                u.username as uploaded_by_username
+            FROM files f
+            LEFT JOIN users u ON f.uploaded_by = u.id
+            WHERE f.project_id = ? AND f.deleted_at IS NULL
+            ORDER BY f.created_at DESC
+        `;
+        
+        const files = await db.all(sql, [projectId]);
+        
+        return files.map(file => ({
+            ...file,
+            uploader_display: file.uploaded_by_name || file.uploaded_by_username || 'Unknown'
+        }));
+    }
+
+    static async getBidFiles(bidId) {
+        const sql = `
+            SELECT f.*, 
+                u.name as uploaded_by_name,
+                u.username as uploaded_by_username
+            FROM files f
+            LEFT JOIN users u ON f.uploaded_by = u.id
+            WHERE f.bid_id = ? AND f.deleted_at IS NULL
+            ORDER BY f.created_at DESC
+        `;
+        
+        const files = await db.all(sql, [bidId]);
+        
+        return files.map(file => ({
+            ...file,
+            uploader_display: file.uploaded_by_name || file.uploaded_by_username || 'Unknown'
+        }));
+    }
     
     static async delete(id) {
         const sql = `DELETE FROM files WHERE id = ?`;
