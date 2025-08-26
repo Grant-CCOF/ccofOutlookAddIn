@@ -62,6 +62,87 @@ router.get('/my-bids', [
     }
 });
 
+router.get('/:id', [
+    authenticateToken,
+    param('id').isInt().withMessage('Valid bid ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const bid = await BidModel.getById(req.params.id);
+        
+        if (!bid) {
+            return res.status(404).json({ error: 'Bid not found' });
+        }
+        
+        // Get project details
+        const project = await ProjectModel.getById(bid.project_id);
+        
+        if (!project) {
+            return res.status(404).json({ error: 'Associated project not found' });
+        }
+        
+        // Check access permissions
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        
+        let hasAccess = false;
+        
+        if (userRole === 'admin') {
+            hasAccess = true;
+        } else if (bid.user_id === userId) {
+            // Bidder can see their own bid
+            hasAccess = true;
+        } else if (project.project_manager_id === userId) {
+            // Project manager can see bids for their project
+            hasAccess = true;
+        }
+        
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        // Get bidder details
+        const bidder = await UserModel.getById(bid.user_id);
+        
+        // Get bid files
+        const FileModel = require('../models/file');
+        bid.files = await FileModel.getBidFiles(bid.id);
+        
+        // Get ratings for the bidder
+        const RatingModel = require('../models/rating');
+        const ratings = await RatingModel.getAverageRatings(bid.user_id);
+        
+        // Combine all information
+        const bidDetails = {
+            ...bid,
+            project: {
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                delivery_date: project.delivery_date,
+                zip_code: project.zip_code,
+                status: project.status,
+                max_bid: project.show_max_bid ? project.max_bid : null
+            },
+            bidder: {
+                id: bidder.id,
+                name: bidder.name,
+                company: bidder.company,
+                email: userRole === 'admin' || project.project_manager_id === userId ? bidder.email : null,
+                phone: userRole === 'admin' || project.project_manager_id === userId ? bidder.phone : null,
+                position: bidder.position
+            },
+            ratings: ratings || null
+        };
+        
+        res.json(bidDetails);
+        
+    } catch (error) {
+        logger.error('Error fetching bid details:', error);
+        res.status(500).json({ error: 'Failed to fetch bid details' });
+    }
+});
+
 // Get bids for a project
 router.get('/project/:projectId', [
     authenticateToken,

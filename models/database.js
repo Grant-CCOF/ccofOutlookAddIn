@@ -29,11 +29,20 @@ class Database {
             
             // Then create tables
             await this.createTables();
+
+            // Check if database is already initialized
+            const userCount = await this.get('SELECT COUNT(*) as count FROM users');
+            
+            if (userCount && userCount.count > 0) {
+                logger.info('Database already initialized, skipping seed');
+                return true;
+            }
             
             // Finally seed data
             await this.seedDefaultData();
             
             logger.info('Database initialization completed successfully');
+            return true;
         } catch (error) {
             logger.error('Database initialization failed:', error);
             this.initializePromise = null; // Reset so it can be retried

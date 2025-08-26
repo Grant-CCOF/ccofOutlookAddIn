@@ -641,37 +641,32 @@ const ProjectsComponent = {
         `;
     },
     
+    // Render bids tab
     renderProjectBidsTab(project) {
-        // Check if project has bids
+        const user = State.getUser();
+        const isManager = user.id === project.project_manager_id || user.role === 'admin';
+        
         if (!project.bids || project.bids.length === 0) {
             return `
                 <div class="empty-state">
-                    <i class="fas fa-gavel" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
+                    <i class="fas fa-gavel fa-3x text-muted mb-3"></i>
                     <h4>No Bids Yet</h4>
                     <p class="text-muted">No bids have been submitted for this project.</p>
-                    ${project.status === 'bidding' ? `
-                        <p class="text-muted">
-                            <i class="fas fa-clock"></i> 
-                            Bidding closes on ${Formatter.date(project.bid_due_date)}
-                        </p>
-                    ` : ''}
                 </div>
             `;
         }
-
-        const userRole = State.getUserRole();
-        const canAcceptBids = (userRole === 'admin' || 
-                              (userRole === 'project_manager' && project.project_manager_id === State.getUserId())) 
-                              && project.status === 'reviewing';
-
+        
         return `
             <div class="bids-list-container">
-                ${project.status === 'bidding' ? `
-                    <div class="alert alert-info mb-3">
-                        <i class="fas fa-info-circle"></i>
-                        Bidding is open until ${Formatter.date(project.bid_due_date)}
-                    </div>
-                ` : ''}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Received Bids (${project.bids.length})</h5>
+                    ${project.status === 'reviewing' && isManager ? `
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i> 
+                            Click on any bid to view full details and award the project
+                        </small>
+                    ` : ''}
+                </div>
                 
                 <div class="table-responsive">
                     <table class="table table-hover">
@@ -679,16 +674,16 @@ const ProjectsComponent = {
                             <tr>
                                 <th>Bidder</th>
                                 <th>Company</th>
-                                <th>Rating</th>
-                                <th>Bid Amount</th>
+                                <th>Amount</th>
                                 <th>Delivery Date</th>
+                                <th>Rating</th>
                                 <th>Submitted</th>
                                 <th>Status</th>
-                                ${canAcceptBids ? '<th>Action</th>' : ''}
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${project.bids.map(bid => this.renderBidRow(bid, project, canAcceptBids)).join('')}
+                            ${project.bids.map(bid => this.renderBidRow(bid, project)).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -696,87 +691,109 @@ const ProjectsComponent = {
         `;
     },
 
+    // Render individual bid row
     renderBidRow(bid, project) {
-        const userRole = State.getUserRole();
-        const isAdmin = userRole === 'admin';
-        const isProjectManager = userRole === 'project_manager';
-        
-        // Add test bid indicator
-        const testBidIndicator = bid.is_test_bid ? 
-            '<span class="badge badge-info ml-2">TEST</span>' : '';
-        const bidNumberIndicator = bid.bid_number > 1 ? 
-            `<span class="badge badge-secondary ml-2">#${bid.bid_number}</span>` : '';
-
-        // Format delivery date
-        let deliveryDateDisplay = '<span class="text-muted">No change</span>';
-        if (bid.alternate_delivery_date) {
-            // Normalize dates to compare only the date portion (not time)
-            const altDate = new Date(bid.alternate_delivery_date);
-            const projDate = new Date(project.delivery_date);
-            
-            // Set both dates to midnight to ensure proper comparison
-            altDate.setHours(0, 0, 0, 0);
-            projDate.setHours(0, 0, 0, 0);
-            
-            if (altDate.getTime() !== projDate.getTime()) {
-                const daysDiff = Math.floor((altDate - projDate) / (1000 * 60 * 60 * 24));
-                const earlier = daysDiff < 0;
-                
-                deliveryDateDisplay = `
-                    <span class="text-${earlier ? 'success' : 'warning'}">
-                        ${Formatter.date(bid.alternate_delivery_date)}
-                        <small class="d-block">(${Math.abs(daysDiff)} days ${earlier ? 'earlier' : 'later'})</small>
-                    </span>
-                `;
-            }
-        }
+        const user = State.getUser();
+        const isManager = user.id === project.project_manager_id || user.role === 'admin';
+        const isBidder = bid.user_id === user.id;
+        const canAward = isManager && project.status === 'reviewing' && bid.status === 'pending';
+        const canWithdraw = isBidder && bid.status === 'pending';
         
         return `
-            <tr class="${bid.status === 'won' ? 'table-success' : ''}">
+            <tr class="bid-row" data-bid-id="${bid.id}">
                 <td>
-                    <strong>${bid.bidder_display || bid.user_name || 'Unknown'}</strong>
-                    ${testBidIndicator}
-                    ${bidNumberIndicator}
+                    <div class="bidder-info">
+                        <strong>${bid.user_name}</strong>
+                        ${bid.position ? `<br><small class="text-muted">${bid.position}</small>` : ''}
+                    </div>
+                </td>
+                <td>${bid.company || '-'}</td>
+                <td>
+                    <strong class="text-primary">${Formatter.currency(bid.amount)}</strong>
+                    ${project.max_bid && project.show_max_bid ? `
+                        <br>
+                        <small class="text-muted">
+                            ${((bid.amount / project.max_bid) * 100).toFixed(0)}% of max
+                        </small>
+                    ` : ''}
                 </td>
                 <td>
-                    ${bid.company || '<span class="text-muted">-</span>'}
+                    ${Formatter.date(bid.alternate_delivery_date || project.delivery_date)}
+                    ${bid.alternate_delivery_time ? `<br><small>${bid.alternate_delivery_time}</small>` : ''}
                 </td>
                 <td>
-                    ${bid.rating ? this.getRatingStars(bid.rating) : '<span class="text-muted">No rating</span>'}
+                    <div class="rating-display">
+                        ${bid.average_rating ? `
+                            ${this.getRatingStars(bid.average_rating)}
+                            <small>(${bid.rating_count || 0})</small>
+                        ` : '<small class="text-muted">No ratings</small>'}
+                    </div>
                 </td>
                 <td>
-                    <span class="h5 mb-0">${Formatter.currency(bid.amount)}</span>
-                </td>
-                <td>${deliveryDateDisplay}</td>
-                <td>
-                    ${Formatter.timeAgo(bid.created_at)}
+                    <small>${Formatter.timeAgo(bid.created_at)}</small>
                 </td>
                 <td>
                     <span class="badge badge-${this.getBidStatusClass(bid.status)}">
-                        ${bid.status.toUpperCase()}
+                        ${bid.status}
                     </span>
                 </td>
-                ${(isAdmin || isProjectManager) && project.status === 'reviewing' ? `
-                    <td>
-                        <button class="btn btn-sm btn-success" 
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="BidDetailModal.showBidDetail(${bid.id}, { showAwardButton: ${canAward} })"
+                            title="View full bid details">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                    ${canAward ? `
+                        <button class="btn btn-sm btn-success ml-1" 
                                 onclick="ProjectsComponent.acceptBid(${project.id}, ${bid.id})"
-                                title="Accept this bid">
-                            <i class="fas fa-check"></i> Accept
+                                title="Quick award">
+                            <i class="fas fa-check"></i>
                         </button>
-                    </td>
-                ` : ''}
+                    ` : ''}
+                    ${canWithdraw ? `
+                        <button class="btn btn-sm btn-danger ml-1" 
+                                onclick="ProjectsComponent.withdrawBidFromProject(${bid.id}, ${project.id})"
+                                title="Withdraw bid">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    ` : ''}
+                </td>
             </tr>
         `;
-    },  
+    },
 
+    // Withdraw bid from project view
+    async withdrawBidFromProject(bidId, projectId) {
+        if (!confirm('Are you sure you want to withdraw this bid?')) {
+            return;
+        }
+        
+        try {
+            App.showLoading(true);
+            await API.bids.withdraw(bidId);
+            App.showSuccess('Bid withdrawn successfully');
+            
+            // Refresh the project detail view
+            await this.renderDetail(projectId);
+            
+        } catch (error) {
+            App.showError('Failed to withdraw bid');
+            // Still refresh on error to ensure UI consistency
+            await this.renderDetail(projectId);
+        } finally {
+            App.showLoading(false);
+        }
+    },
+ 
+    // Get bid status class
     getBidStatusClass(status) {
         const statusClasses = {
-            'pending': 'secondary',
-            'submitted': 'info',
+            'pending': 'warning',
+            'submitted': 'info', 
             'reviewing': 'warning',
             'won': 'success',
             'lost': 'danger',
-            'withdrawn': 'dark'
+            'withdrawn': 'secondary'
         };
         return statusClasses[status] || 'secondary';
     },
@@ -802,6 +819,7 @@ const ProjectsComponent = {
         }
     },
 
+    // Helper function to get rating stars
     getRatingStars(rating) {
         const fullStars = Math.floor(rating);
         const hasHalfStar = rating % 1 >= 0.5;
@@ -815,7 +833,7 @@ const ProjectsComponent = {
             stars += '<i class="fas fa-star-half-alt text-warning"></i>';
         }
         for (let i = 0; i < emptyStars; i++) {
-            stars += '<i class="far fa-star text-warning"></i>';
+            stars += '<i class="far fa-star text-muted"></i>';
         }
         
         return stars;
@@ -1015,22 +1033,27 @@ const ProjectsComponent = {
     },
     
     async markComplete(projectId) {
-        if (!confirm('Are you sure you want to mark this project as complete?')) {
-            return;
-        }
-        
         try {
-            await API.projects.complete(projectId);
-            App.showSuccess('Project marked as complete');
+            // Get project details to show in modal
+            const project = await API.projects.getById(projectId);
             
-            // Check current page and refresh accordingly
-            if (window.location.hash.includes(`/projects/${projectId}`)) {
-                await this.renderDetail(projectId);
-            } else {
-                await this.loadProjects();
+            if (!project.awarded_to) {
+                App.showError('Cannot complete project without an awarded contractor');
+                return;
             }
+            
+            // Show rating modal
+            RatingModal.showCompletionRatingModal(project, async () => {
+                // Refresh the view after successful completion
+                if (window.location.hash.includes(`/projects/${projectId}`)) {
+                    await this.renderDetail(projectId);
+                } else {
+                    await this.loadProjects();
+                }
+            });
+            
         } catch (error) {
-            App.showError('Failed to complete project');
+            App.showError('Failed to load project details');
         }
     },
         

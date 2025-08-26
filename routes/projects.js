@@ -298,11 +298,12 @@ router.post('/:id/award', [
     }
 });
 
-// Mark project as completed
+// Mark project as completed with optional review
 router.post('/:id/complete', [
     authenticateToken,
     requireRole(['admin', 'project_manager']),
     param('id').isInt().withMessage('Valid project ID required'),
+    body('rating').optional().isObject(),
     handleValidationErrors
 ], async (req, res) => {
     try {
@@ -321,7 +322,30 @@ router.post('/:id/complete', [
             return res.status(400).json({ error: 'Only awarded projects can be marked as completed' });
         }
         
+        // Mark project as completed
         await ProjectModel.markCompleted(req.params.id);
+        
+        // If rating was provided, submit it
+        if (req.body.rating && project.awarded_to) {
+            const RatingModel = require('../models/rating');
+            
+            // Check if rating already exists
+            const existingRating = await RatingModel.getByProjectAndRater(req.params.id, req.user.id);
+            
+            if (!existingRating) {
+                await RatingModel.create({
+                    project_id: req.params.id,
+                    rated_user_id: project.awarded_to,
+                    rated_by_user_id: req.user.id,
+                    price: req.body.rating.price || 5,
+                    speed: req.body.rating.speed || 5,
+                    quality: req.body.rating.quality || 5,
+                    responsiveness: req.body.rating.responsiveness || 5,
+                    customer_satisfaction: req.body.rating.customer_satisfaction || 5,
+                    comments: req.body.rating.comments || ''
+                });
+            }
+        }
         
         logger.info(`Project completed: ${project.id}`);
         
@@ -393,5 +417,7 @@ router.post('/:id/admin-reset', [
         res.status(500).json({ error: 'Failed to reset project' });
     }
 });
+
+
 
 module.exports = router;

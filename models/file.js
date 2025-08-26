@@ -69,7 +69,7 @@ class FileModel {
                 u.username as uploaded_by_username
             FROM files f
             LEFT JOIN users u ON f.uploaded_by = u.id
-            WHERE f.project_id = ? AND f.deleted_at IS NULL
+            WHERE f.project_id = ?
             ORDER BY f.created_at DESC
         `;
         
@@ -88,7 +88,7 @@ class FileModel {
                 u.username as uploaded_by_username
             FROM files f
             LEFT JOIN users u ON f.uploaded_by = u.id
-            WHERE f.bid_id = ? AND f.deleted_at IS NULL
+            WHERE f.bid_id = ?
             ORDER BY f.created_at DESC
         `;
         

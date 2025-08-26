@@ -249,6 +249,11 @@ class ProjectModel {
         const result = await db.get(sql, [status]);
         return result.count;
     }
+
+    static async markCompleted(id) {
+        const sql = `UPDATE projects SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+        return db.run(sql, [id]);
+    }
 }
 
 module.exports = ProjectModel;

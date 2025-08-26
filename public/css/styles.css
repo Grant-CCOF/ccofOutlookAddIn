@@ -2081,3 +2081,267 @@ body.sidebar-collapsed .main-content {
 #selectedFilesList li:last-child {
     border-bottom: none;
 }
+
+/* Rating Modal Styles */
+.rating-category {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.rating-label {
+    font-weight: 600;
+    color: #333;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.star-rating {
+    display: flex;
+    gap: 5px;
+    margin: 10px 0;
+}
+
+.star-icon {
+    font-size: 24px;
+    color: #ddd;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.star-icon:hover,
+.star-icon.hover {
+    color: #ffc107;
+    transform: scale(1.1);
+}
+
+.star-icon.active {
+    color: #ffc107;
+}
+
+.rating-intro {
+    padding: 15px;
+    background: #e3f2fd;
+    border-radius: 8px;
+    border-left: 4px solid #2196f3;
+}
+
+.rating-intro p {
+    margin-bottom: 5px;
+}
+
+.rating-intro p:last-child {
+    margin-bottom: 0;
+}
+
+/* Bid Detail Modal Styles (Updated) */
+.bid-detail-container {
+    padding: 10px;
+}
+
+.bid-summary-row {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.bid-summary-row h5 {
+    font-weight: 600;
+    color: #333;
+}
+
+.bid-summary-row h3 {
+    margin-top: 5px;
+}
+
+.detail-section {
+    margin-bottom: 30px;
+}
+
+.detail-section h5 {
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.detail-list {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+}
+
+.detail-list dt {
+    font-weight: 600;
+    color: #666;
+}
+
+.detail-list dd {
+    margin: 0;
+    color: #333;
+}
+
+.comments-box {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #4a90e2;
+}
+
+/* Files List Styles (Updated for single column) */
+.files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.file-item-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    gap: 15px;
+}
+
+.file-item-row:hover {
+    background: #e9ecef;
+    transform: translateX(5px);
+}
+
+.file-item-row .file-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+    width: 30px;
+    text-align: center;
+}
+
+.file-item-row .file-details {
+    flex: 1;
+    min-width: 0; /* Important for text truncation */
+}
+
+.file-item-row .file-name {
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+/* Allow wrapping only when necessary on small screens */
+@media (max-width: 576px) {
+    .file-item-row .file-name {
+        white-space: normal;
+        word-break: break-word;
+    }
+}
+
+.file-item-row .file-size {
+    font-size: 0.875rem;
+}
+
+.file-item-row .file-actions {
+    flex-shrink: 0;
+}
+
+.rating-overview {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.overall-rating {
+    padding: 20px;
+}
+
+.overall-rating h2 {
+    color: #4a90e2;
+    font-weight: bold;
+}
+
+.star-rating {
+    margin: 10px 0;
+}
+
+.rating-breakdown {
+    padding: 10px;
+}
+
+.rating-bar-item {
+    margin-bottom: 15px;
+}
+
+.comparison-info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.modal-actions {
+    padding-top: 20px;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .detail-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .detail-list dt {
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    
+    .file-item-row {
+        flex-wrap: wrap;
+    }
+    
+    .file-item-row .file-details {
+        flex: 1 1 100%;
+        margin-bottom: 10px;
+    }
+    
+    .file-item-row .file-actions {
+        margin-left: 45px; /* Align with text after icon */
+    }
+}
+
+/* Bid Row Hover Effect */
+.bid-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.bid-row:hover {
+    background-color: #f8f9fa;
+}
+
+.bidder-info {
+    min-width: 150px;
+}
+
+.rating-display {
+    white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .detail-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .detail-list dt {
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    
+    .files-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -481,9 +481,14 @@ const BidsComponent = {
         }
     },
     
-    // View bid details
+    // View bid details (from bids page)
     async viewBid(bidId) {
-        Router.navigate(`/bids/${bidId}`);
+        BidDetailModal.showBidDetail(bidId);
+    },
+
+    // View bid details with additional options
+    async viewBidDetails(bidId, options = {}) {
+        BidDetailModal.showBidDetail(bidId, options);
     },
     
     // Edit bid
@@ -501,29 +506,63 @@ const BidsComponent = {
         }
         
         try {
+            App.showLoading(true);
             await API.bids.withdraw(bidId);
             App.showSuccess('Bid withdrawn successfully');
+            
+            // Remove the bid from the current state immediately
+            this.state.bids = this.state.bids.filter(b => b.id !== bidId);
+            
+            // Re-render the view
+            this.renderContractorBids();
+            
+            // Also reload from server to ensure consistency
             await this.loadBids();
+            
         } catch (error) {
             App.showError('Failed to withdraw bid');
+            // Reload on error to ensure UI is in sync
+            await this.loadBids();
+        } finally {
+            App.showLoading(false);
         }
     },
     
     // Accept bid (for managers)
     async acceptBid(bidId) {
         const bid = this.state.bids.find(b => b.id === bidId);
-        if (!bid) return;
+        if (!bid) {
+            App.showError('Bid not found');
+            await this.loadBids(); // Refresh if bid doesn't exist
+            return;
+        }
         
         if (!confirm(`Accept bid of ${Formatter.currency(bid.amount)} from ${bid.user_name}?`)) {
             return;
         }
         
         try {
+            App.showLoading(true);
             await API.projects.award(bid.project_id, bidId);
             App.showSuccess('Bid accepted and project awarded');
+            
+            // Refresh the bids list
             await this.loadBids();
+            
+            // If we're in a project view, refresh that too
+            const currentHash = window.location.hash;
+            if (currentHash.includes('/projects/') && window.ProjectsComponent) {
+                const projectId = currentHash.split('/projects/')[1];
+                if (projectId) {
+                    await ProjectsComponent.renderDetail(projectId);
+                }
+            }
+            
         } catch (error) {
             App.showError('Failed to accept bid');
+            await this.loadBids(); // Refresh on error
+        } finally {
+            App.showLoading(false);
         }
     },
     

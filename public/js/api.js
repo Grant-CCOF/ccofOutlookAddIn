@@ -286,6 +286,7 @@ API.projects = {
 API.bids = {
     getAll: (params) => API.get('/bids', params),
     getMyBids: (params) => API.get('/bids/my-bids', params),
+    getById: (id) => API.get(`/bids/${id}`),
     getProjectBids: (projectId) => API.get(`/bids/project/${projectId}`),
     submit: (data) => API.post('/bids', data),
     update: (id, data) => API.put(`/bids/${id}`, data),
