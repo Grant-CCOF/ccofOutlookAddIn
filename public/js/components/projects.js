@@ -1158,7 +1158,7 @@ const ProjectsComponent = {
 
     // Accept a bid
     async acceptBid(projectId, bidId) {
-        // Show modal with comment field
+        // Create modal content
         const content = `
             <div class="award-confirmation">
                 <p>Are you sure you want to accept this bid?</p>
@@ -1176,28 +1176,78 @@ const ProjectsComponent = {
             </div>
         `;
         
-        Modals.show('Accept Bid', content, {
-            confirmText: 'Accept Bid',
-            confirmClass: 'btn-success',
-            onConfirm: async () => {
-                const comment = DOM.get('quickAwardComment')?.value.trim() || '';
-                
-                try {
-                    App.showLoading(true);
-                    await API.projects.award(projectId, { bidId, comment });
-                    App.showSuccess('Bid accepted successfully! The contractor has been notified.');
-                    Modals.close();
-                    
-                    // Reload the project details
-                    await this.renderDetail(projectId);
-                } catch (error) {
-                    Config.error('Failed to accept bid:', error);
-                    App.showError(error.message || 'Failed to accept bid');
-                } finally {
-                    App.showLoading(false);
-                }
-            }
-        });
+        // Create modal ID
+        const modalId = `modal-award-${Date.now()}`;
+        
+        // Create modal HTML
+        const modalHTML = `
+            <div class="modal fade show" id="${modalId}" tabindex="-1" style="display: block;">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Accept Bid</h5>
+                            <button type="button" class="close" onclick="ProjectsComponent.closeAwardModal('${modalId}')">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            ${content}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-success" onclick="ProjectsComponent.confirmAward(${projectId}, ${bidId}, '${modalId}')">
+                                Accept Bid
+                            </button>
+                            <button type="button" class="btn btn-outline" onclick="ProjectsComponent.closeAwardModal('${modalId}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop fade show" id="${modalId}-backdrop"></div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        document.body.classList.add('modal-open');
+    },
+
+    async confirmAward(projectId, bidId, modalId) {
+        const comment = document.getElementById('quickAwardComment')?.value.trim() || '';
+        
+        try {
+            App.showLoading(true);
+            await API.projects.award(projectId, { bidId, comment });
+            App.showSuccess('Bid accepted successfully! The contractor has been notified.');
+            
+            // Close modal
+            this.closeAwardModal(modalId);
+            
+            // Reload the project details
+            await this.renderDetail(projectId);
+        } catch (error) {
+            Config.error('Failed to accept bid:', error);
+            App.showError(error.message || 'Failed to accept bid');
+        } finally {
+            App.showLoading(false);
+        }
+    },
+
+    closeAwardModal(modalId) {
+        const modal = document.getElementById(modalId);
+        const backdrop = document.getElementById(`${modalId}-backdrop`);
+        
+        if (modal) {
+            modal.remove();
+        }
+        if (backdrop) {
+            backdrop.remove();
+        }
+        
+        // Remove modal-open class if no more modals
+        if (!document.querySelector('.modal.show')) {
+            document.body.classList.remove('modal-open');
+        }
     },
 
     // Show file upload modal

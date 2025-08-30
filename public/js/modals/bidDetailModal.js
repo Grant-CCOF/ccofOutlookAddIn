@@ -86,6 +86,27 @@
                             </div>
                         </div>
                     </div>
+
+                    ${bid.status === 'won' && bid.award_comment ? `
+                        <div class="alert alert-success mt-3">
+                            <h6><i class="fas fa-trophy"></i> Award Comment from Project Manager</h6>
+                            <p class="mb-0">${bid.award_comment}</p>
+                        </div>
+                    ` : ''}
+
+                    ${bid.status === 'won' && !bid.award_comment ? `
+                        <div class="alert alert-success mt-3">
+                            <i class="fas fa-trophy"></i>
+                            <strong>Congratulations!</strong> Your bid was accepted for this project.
+                        </div>
+                    ` : ''}
+
+                    ${bid.status === 'lost' ? `
+                        <div class="alert alert-danger mt-3">
+                            <i class="fas fa-times-circle"></i>
+                            Unfortunately, your bid was not selected for this project.
+                        </div>
+                    ` : ''}
                     
                     <hr>
                     
@@ -384,7 +405,7 @@
         
         // Award bid
         async awardBid(projectId, bidId) {
-            // Show modal with comment field
+            // Create modal content
             const content = `
                 <div class="award-confirmation">
                     <p>Are you sure you want to award this bid?</p>
@@ -402,27 +423,61 @@
                 </div>
             `;
             
-            Modals.show('Award Bid', content, {
-                confirmText: 'Award',
-                confirmClass: 'btn-success',
-                onConfirm: async () => {
-                    const comment = DOM.get('awardCommentModal')?.value.trim() || '';
-                    
-                    try {
-                        await API.projects.award(projectId, { bidId, comment });
-                        App.showSuccess('Bid awarded successfully!');
-                        this.closeModal();
-                        Modals.close();
-                        
-                        // Refresh the page
-                        if (window.ProjectsComponent) {
-                            ProjectsComponent.renderDetail(projectId);
-                        }
-                    } catch (error) {
-                        App.showError('Failed to award bid');
-                    }
+            // Create a custom modal for award confirmation
+            const modalId = `modal-award-${Date.now()}`;
+            
+            const modalHTML = `
+                <div class="modal fade show" id="${modalId}" tabindex="-1" style="display: block;">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Award Bid</h5>
+                                <button type="button" class="close" onclick="BidDetailModal.closeModal('${modalId}')">
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                ${content}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-success" 
+                                        onclick="BidDetailModal.confirmAward(${projectId}, ${bidId}, '${modalId}')">
+                                    Award
+                                </button>
+                                <button type="button" class="btn btn-outline" 
+                                        onclick="BidDetailModal.closeModal('${modalId}')">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-backdrop fade show" id="${modalId}-backdrop"></div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            document.body.classList.add('modal-open');
+        },
+
+        // Add this new method to handle the award confirmation:
+        async confirmAward(projectId, bidId, modalId) {
+            const comment = document.getElementById('awardCommentModal')?.value.trim() || '';
+            
+            try {
+                await API.projects.award(projectId, { bidId, comment });
+                App.showSuccess('Bid awarded successfully!');
+                
+                // Close both modals
+                this.closeModal(modalId);
+                this.closeModal(); // Close the bid detail modal too
+                
+                // Refresh the page
+                if (window.ProjectsComponent) {
+                    ProjectsComponent.renderDetail(projectId);
                 }
-            });
+            } catch (error) {
+                App.showError('Failed to award bid');
+            }
         },
         
         // Edit bid
