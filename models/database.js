@@ -58,7 +58,32 @@ class Database {
                     reject(err);
                 } else {
                     logger.info('Connected to SQLite database');
-                    resolve();
+                    
+                    // Configure SQLite for better concurrency and performance
+                    this.db.serialize(() => {
+                        // Enable WAL mode for better concurrent access
+                        this.db.run("PRAGMA journal_mode = WAL", (err) => {
+                            if (err) logger.warn('Could not set WAL mode:', err);
+                            else logger.info('WAL mode enabled');
+                        });
+                        
+                        // Set busy timeout to 5 seconds (5000ms)
+                        this.db.run("PRAGMA busy_timeout = 5000", (err) => {
+                            if (err) logger.warn('Could not set busy timeout:', err);
+                            else logger.info('Busy timeout set to 5000ms');
+                        });
+                        
+                        // Optimize SQLite performance
+                        this.db.run("PRAGMA synchronous = NORMAL");
+                        this.db.run("PRAGMA cache_size = -64000"); // 64MB cache
+                        this.db.run("PRAGMA temp_store = MEMORY");
+                        this.db.run("PRAGMA mmap_size = 30000000000"); // 30GB mmap
+                        
+                        // Foreign keys support
+                        this.db.run("PRAGMA foreign_keys = ON");
+                        
+                        resolve();
+                    });
                 }
             });
         });
@@ -191,8 +216,11 @@ class Database {
         try {
             logger.info('Starting seed data process...');
             
-            // Use a transaction to ensure atomicity
-            await this.run('BEGIN TRANSACTION');
+            // Add a small delay to ensure tables are created
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Use IMMEDIATE transaction to avoid lock conflicts
+            await this.run('BEGIN IMMEDIATE TRANSACTION');
             
             try {
                 // Check if admin exists by username OR email
@@ -231,23 +259,38 @@ class Database {
         } catch (error) {
             if (error.code === 'SQLITE_CONSTRAINT') {
                 logger.info('Admin user already exists in database - skipping creation');
+            } else if (error.code === 'SQLITE_BUSY') {
+                logger.warn('Database busy during seeding, but this is non-critical');
             } else {
                 logger.warn('Non-critical error during data seeding:', error.message);
             }
         }
     }
 
-    run(sql, params = []) {
+    run(sql, params = [], maxRetries = 3) {
         return new Promise((resolve, reject) => {
-            this.db.run(sql, params, function(err) {
-                if (err) {
-                    logger.error('Database run error:', err);
-                    logger.error('Stack trace:', new Error().stack);
-                    reject(err);
-                } else {
-                    resolve({ id: this.lastID, changes: this.changes });
-                }
-            });
+            let attempts = 0;
+            
+            const executeQuery = () => {
+                this.db.run(sql, params, function(err) {
+                    if (err) {
+                        if (err.code === 'SQLITE_BUSY' && attempts < maxRetries) {
+                            attempts++;
+                            logger.warn(`Database busy, retrying... (attempt ${attempts}/${maxRetries})`);
+                            setTimeout(executeQuery, 100 * attempts); // Exponential backoff
+                        } else {
+                            logger.error('Database run error:', err);
+                            logger.error('SQL:', sql);
+                            logger.error('Params:', params);
+                            reject(err);
+                        }
+                    } else {
+                        resolve({ id: this.lastID, changes: this.changes });
+                    }
+                });
+            };
+            
+            executeQuery();
         });
     }
 
