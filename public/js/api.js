@@ -281,7 +281,7 @@ API.projects = {
     startBidding: (id) => API.post(`/projects/${id}/start-bidding`),
     award: (id, data) => API.post(`/projects/${id}/award`, { 
         bidId: parseInt(data.bidId, 10),
-        comment: data.comment || null  // Add comment support
+        comment: data.comment || ""  // Add comment support
     }),
     complete: (id) => API.post(`/projects/${id}/complete`)
 };

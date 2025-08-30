@@ -387,6 +387,43 @@ const UserTemplates = {
             </div>
         `;
     },
+
+    getUserReviewCards(reviews) {
+        if (!reviews || reviews.length === 0) {
+            return '<p class="text-muted">No reviews yet</p>';
+        }
+        
+        return reviews.map(review => `
+            <div class="review-card mb-3">
+                <div class="review-header">
+                    <div class="review-rating">
+                        ${this.renderStars((review.price + review.speed + review.quality + 
+                                        review.responsiveness + review.customer_satisfaction) / 5)}
+                    </div>
+                    <div class="review-meta">
+                        <small class="text-muted">
+                            Project: ${review.project_title || 'N/A'} | 
+                            By: ${review.rated_by_name || 'Anonymous'} | 
+                            ${Formatter.date(review.created_at)}
+                        </small>
+                    </div>
+                </div>
+                ${review.comments ? `
+                    <div class="review-comment mt-2">
+                        <p>${review.comments}</p>
+                    </div>
+                ` : ''}
+                <div class="review-breakdown mt-2">
+                    <small>
+                        Price: ${review.price}/5 | 
+                        Speed: ${review.speed}/5 | 
+                        Quality: ${review.quality}/5 | 
+                        Responsiveness: ${review.responsiveness}/5
+                    </small>
+                </div>
+            </div>
+        `).join('');
+    },
     
     // Get user info card
     getUserInfoCard(user) {

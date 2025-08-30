@@ -67,6 +67,22 @@ router.get('/project/:projectId', [
     }
 });
 
+// Get reviews for a user
+router.get('/user/:userId/reviews', [
+    authenticateToken,
+    requireRole(['admin', 'project_manager']),
+    param('userId').isInt().withMessage('Valid user ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const reviews = await RatingModel.getByUser(req.params.userId);
+        res.json({ reviews });
+    } catch (error) {
+        logger.error('Error fetching user reviews:', error);
+        res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+});
+
 // Submit a rating
 router.post('/', [
     authenticateToken,

@@ -129,18 +129,16 @@ const ProfileComponent = {
     },
 
     shouldShowOwnRatings(user) {
-        // Only show ratings section if:
-        // 1. User is a PM or Admin (they can see ratings)
-        // 2. User is viewing their own profile
-        // 3. User is an installer/operations (has ratings to show)
         const currentUser = State.getUser();
         const isOwnProfile = currentUser && currentUser.id === user.id;
-        const canViewRatings = currentUser && 
-            (currentUser.role === 'admin' || currentUser.role === 'project_manager');
-        const hasRatings = ['installation_company', 'operations'].includes(user.role);
+        const canViewRatings = currentUser.role === 'admin' || currentUser.role === 'project_manager';
+        const hasRatings = ['installation_company', 'operations', 'admin'].includes(user.role);
         
-        // Show only if viewing own profile, has permission, and user type has ratings
-        return isOwnProfile && canViewRatings && hasRatings;
+        // Show if: PM/Admin viewing any installer OR installer viewing own profile
+        if (canViewRatings && hasRatings) return true;
+        if (isOwnProfile && hasRatings) return true;
+        
+        return false;
     },
 
     renderProfileForm(user) {
