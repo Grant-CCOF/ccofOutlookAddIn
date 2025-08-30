@@ -139,6 +139,7 @@ class Database {
                 comments TEXT,
                 alternate_delivery_date DATE,
                 status TEXT DEFAULT 'pending',
+                award_comment TEXT,
                 bid_number INTEGER DEFAULT 1,
                 is_test_bid INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

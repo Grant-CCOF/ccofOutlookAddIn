@@ -63,7 +63,12 @@ const BidTemplates = {
                         </div>
                     ` : ''}
                     
-                    ${bid.status === 'won' ? `
+                    ${bid.status === 'won' && bid.award_comment ? `
+                        <div class="alert alert-success mt-3">
+                            <h6><i class="fas fa-trophy"></i> Award Comment</h6>
+                            <p class="mb-0">${bid.award_comment}</p>
+                        </div>
+                    ` : bid.status === 'won' ? `
                         <div class="alert alert-success">
                             <i class="fas fa-trophy"></i>
                             <strong>Congratulations!</strong> Your bid was accepted for this project.

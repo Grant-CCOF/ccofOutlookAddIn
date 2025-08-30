@@ -384,22 +384,45 @@
         
         // Award bid
         async awardBid(projectId, bidId) {
-            if (!confirm('Are you sure you want to award this bid? This action cannot be undone.')) {
-                return;
-            }
+            // Show modal with comment field
+            const content = `
+                <div class="award-confirmation">
+                    <p>Are you sure you want to award this bid?</p>
+                    <div class="form-group mt-3">
+                        <label>Award Comment (Optional)</label>
+                        <textarea class="form-control" 
+                                id="awardCommentModal" 
+                                rows="3" 
+                                placeholder="Add a comment for the winning bidder"></textarea>
+                    </div>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        This action cannot be undone.
+                    </div>
+                </div>
+            `;
             
-            try {
-                await API.projects.award(projectId, { bidId });
-                App.showSuccess('Bid awarded successfully!');
-                this.closeModal();
-                
-                // Refresh the page
-                if (window.ProjectsComponent) {
-                    ProjectsComponent.renderDetail(projectId);
+            Modals.show('Award Bid', content, {
+                confirmText: 'Award',
+                confirmClass: 'btn-success',
+                onConfirm: async () => {
+                    const comment = DOM.get('awardCommentModal')?.value.trim() || '';
+                    
+                    try {
+                        await API.projects.award(projectId, { bidId, comment });
+                        App.showSuccess('Bid awarded successfully!');
+                        this.closeModal();
+                        Modals.close();
+                        
+                        // Refresh the page
+                        if (window.ProjectsComponent) {
+                            ProjectsComponent.renderDetail(projectId);
+                        }
+                    } catch (error) {
+                        App.showError('Failed to award bid');
+                    }
                 }
-            } catch (error) {
-                App.showError('Failed to award bid');
-            }
+            });
         },
         
         // Edit bid

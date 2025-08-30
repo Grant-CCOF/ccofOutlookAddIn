@@ -56,17 +56,17 @@ const ProjectModals = {
                     ${project.bids.map(bid => `
                         <div class="bid-option">
                             <input type="radio" 
-                                   name="selectedBid" 
-                                   id="bid-${bid.id}" 
-                                   value="${bid.id}">
+                                name="selectedBid" 
+                                id="bid-${bid.id}" 
+                                value="${bid.id}">
                             <label for="bid-${bid.id}" class="bid-label">
                                 <div class="bid-info">
                                     <div class="bidder-name">${bid.user_name}</div>
                                     <div class="bidder-company">${bid.company}</div>
-                                </div>
-                                <div class="bid-amount">${Formatter.currency(bid.amount)}</div>
-                                <div class="bid-date">
-                                    Submitted ${Formatter.timeAgo(bid.created_at)}
+                                    <div class="bid-amount">${Formatter.currency(bid.amount)}</div>
+                                    <div class="bid-date">
+                                        Submitted ${Formatter.timeAgo(bid.created_at)}
+                                    </div>
                                 </div>
                             </label>
                         </div>
@@ -74,11 +74,11 @@ const ProjectModals = {
                 </div>
                 
                 <div class="form-group mt-3">
-                    <label>Award Message (Optional)</label>
+                    <label>Award Comment (Optional)</label>
                     <textarea class="form-control" 
-                              id="awardMessage" 
-                              rows="3" 
-                              placeholder="Add a message for the winner..."></textarea>
+                            id="awardComment" 
+                            rows="3" 
+                            placeholder="Add a comment for the winning bidder (e.g., congratulations, next steps, etc.)"></textarea>
                 </div>
             </div>
         `;
@@ -517,16 +517,16 @@ const ProjectModals = {
     
     // Handle award project
     async handleAwardProject(projectId) {
-        const selectedBid = document.querySelector('input[name="selectedBid"]:checked');
+        const selectedBidEl = document.querySelector('input[name="selectedBid"]:checked');
+        const commentEl = DOM.get('awardComment');
         
-        if (!selectedBid) {
+        if (!selectedBidEl) {
             App.showError('Please select a bid to award');
             return;
         }
         
-        // Convert bidId to integer
-        const bidId = parseInt(selectedBid.value, 10);
-        const message = DOM.getValue('awardMessage');
+        const bidId = parseInt(selectedBidEl.value);
+        const comment = commentEl ? commentEl.value.trim() : '';
         
         if (!confirm('Are you sure you want to award this project? This action cannot be undone.')) {
             return;
@@ -535,7 +535,7 @@ const ProjectModals = {
         try {
             App.showLoading(true);
             
-            await API.projects.award(projectId, { bidId, message });
+            await API.projects.award(projectId, { bidId, comment });
             
             App.showSuccess('Project awarded successfully');
             this.closeModal();

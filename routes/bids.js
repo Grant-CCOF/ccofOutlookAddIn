@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, param } = require('express-validator');
 const BidModel = require('../models/bid');
 const ProjectModel = require('../models/project');
+const FileModel = require('../models/file');
 const UserModel = require('../models/user');
 const NotificationService = require('../services/notificationService');
 const emailService = require('../services/emailService');
@@ -349,6 +350,16 @@ router.delete('/:id', [
             return res.status(400).json({ error: 'Cannot withdraw bid from awarded/completed project' });
         }
         
+        // DELETE ASSOCIATED FILES FIRST (This was missing!)
+        try {
+            await FileModel.deleteByBid(req.params.id);
+            logger.info(`Deleted files for bid ${req.params.id}`);
+        } catch (fileError) {
+            logger.error(`Error deleting files for bid ${req.params.id}:`, fileError);
+            // Continue with bid deletion even if file deletion fails
+        }
+        
+        // Now delete the bid
         await BidModel.delete(req.params.id);
         
         logger.info(`Bid withdrawn: ${req.params.id} by user ${req.user.id}`);

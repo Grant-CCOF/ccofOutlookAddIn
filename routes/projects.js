@@ -251,6 +251,7 @@ router.post('/:id/award', [
     requireRole(['admin', 'project_manager']),
     param('id').isInt().withMessage('Valid project ID required'),
     body('bidId').isInt().withMessage('Valid bid ID required'),
+    body('comment').optional().isString().withMessage('Comment must be a string'), // Add this
     handleValidationErrors
 ], async (req, res) => {
     try {
@@ -275,9 +276,9 @@ router.post('/:id/award', [
             return res.status(404).json({ error: 'Bid not found for this project' });
         }
         
-        // Award project
+        // Award project with comment
         await ProjectModel.awardProject(project.id, bid.id, bid.amount);
-        await BidModel.updateProjectBidsStatus(project.id, bid.id);
+        await BidModel.updateProjectBidsStatus(project.id, bid.id, req.body.comment); // Pass comment here
         
         // Notify winner and losers
         await NotificationService.notifyBidStatusChange(bid, project, 'won');
@@ -289,7 +290,7 @@ router.post('/:id/award', [
             }
         }
         
-        logger.info(`Project awarded: ${project.id} to bid ${bid.id}`);
+        logger.info(`Project awarded: ${project.id} to bid ${bid.id} with comment: ${req.body.comment || 'none'}`);
         
         res.json({ message: 'Project awarded successfully' });
     } catch (error) {

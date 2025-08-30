@@ -155,12 +155,14 @@ class BidModel {
         return db.run(sql, [status, id]);
     }
     
-    static async updateProjectBidsStatus(projectId, winnerId) {
+    static async updateProjectBidsStatus(projectId, winnerId, awardComment = null) {
+        // Update winning bid with award comment
         await db.run(
-            `UPDATE bids SET status = 'won', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [winnerId]
+            `UPDATE bids SET status = 'won', award_comment = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [awardComment, winnerId]
         );
         
+        // Update losing bids
         await db.run(
             `UPDATE bids SET status = 'lost', updated_at = CURRENT_TIMESTAMP WHERE project_id = ? AND id != ?`,
             [projectId, winnerId]

@@ -747,14 +747,14 @@ const ProjectsComponent = {
                         <button class="btn btn-sm btn-success ml-1" 
                                 onclick="ProjectsComponent.acceptBid(${project.id}, ${bid.id})"
                                 title="Quick award">
-                            <i class="fas fa-check"></i>
+                            <i class="fas fa-check"></i> Award
                         </button>
                     ` : ''}
                     ${canWithdraw ? `
                         <button class="btn btn-sm btn-danger ml-1" 
                                 onclick="ProjectsComponent.withdrawBidFromProject(${bid.id}, ${project.id})"
                                 title="Withdraw bid">
-                            <i class="fas fa-times"></i>
+                            <i class="fas fa-times"></i> Withdraw
                         </button>
                     ` : ''}
                 </td>
@@ -1158,23 +1158,46 @@ const ProjectsComponent = {
 
     // Accept a bid
     async acceptBid(projectId, bidId) {
-        if (!confirm('Are you sure you want to accept this bid? This action cannot be undone.')) {
-            return;
-        }
+        // Show modal with comment field
+        const content = `
+            <div class="award-confirmation">
+                <p>Are you sure you want to accept this bid?</p>
+                <div class="form-group mt-3">
+                    <label>Award Comment (Optional)</label>
+                    <textarea class="form-control" 
+                            id="quickAwardComment" 
+                            rows="3" 
+                            placeholder="Add a comment for the winning bidder"></textarea>
+                </div>
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This action cannot be undone.
+                </div>
+            </div>
+        `;
         
-        try {
-            App.showLoading(true);
-            await API.projects.award(projectId, { bidId });
-            App.showSuccess('Bid accepted successfully! The contractor has been notified.');
-            
-            // Reload the project details
-            await this.renderDetail(projectId);
-        } catch (error) {
-            Config.error('Failed to accept bid:', error);
-            App.showError(error.message || 'Failed to accept bid');
-        } finally {
-            App.showLoading(false);
-        }
+        Modals.show('Accept Bid', content, {
+            confirmText: 'Accept Bid',
+            confirmClass: 'btn-success',
+            onConfirm: async () => {
+                const comment = DOM.get('quickAwardComment')?.value.trim() || '';
+                
+                try {
+                    App.showLoading(true);
+                    await API.projects.award(projectId, { bidId, comment });
+                    App.showSuccess('Bid accepted successfully! The contractor has been notified.');
+                    Modals.close();
+                    
+                    // Reload the project details
+                    await this.renderDetail(projectId);
+                } catch (error) {
+                    Config.error('Failed to accept bid:', error);
+                    App.showError(error.message || 'Failed to accept bid');
+                } finally {
+                    App.showLoading(false);
+                }
+            }
+        });
     },
 
     // Show file upload modal
