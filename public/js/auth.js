@@ -91,6 +91,31 @@ const Auth = {
             return null;
         }
     },
+
+    // Check if current user can view ratings
+    canViewRatings() {
+        const user = this.getUser();
+        if (!user) return false;
+        
+        // Only Project Managers and Admins can view ratings
+        return user.role === 'admin' || user.role === 'project_manager';
+    },
+    
+    // Check if current user is an installer (who might have ratings)
+    isInstaller() {
+        const user = this.getUser();
+        if (!user) return false;
+        
+        return user.role === 'installation_company' || user.role === 'operations';
+    },
+    
+    // Check if user can rate others (only PMs and Admins)
+    canSubmitRatings() {
+        const user = this.getUser();
+        if (!user) return false;
+        
+        return user.role === 'admin' || user.role === 'project_manager';
+    },
     
     // Refresh auth token
     async refreshToken() {

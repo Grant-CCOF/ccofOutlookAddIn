@@ -12,6 +12,7 @@ const logger = require('../utils/logger');
 // Get ratings for a user
 router.get('/user/:userId', [
     authenticateToken,
+    requireRole(['admin', 'project_manager']),
     param('userId').isInt().withMessage('Valid user ID required'),
     handleValidationErrors
 ], async (req, res) => {
@@ -39,6 +40,7 @@ router.get('/user/:userId', [
 // Get ratings for a project
 router.get('/project/:projectId', [
     authenticateToken,
+    requireRole(['admin', 'project_manager']),
     param('projectId').isInt().withMessage('Valid project ID required'),
     handleValidationErrors
 ], async (req, res) => {
@@ -153,6 +155,7 @@ router.post('/', [
 // Get rating summary for a user
 router.get('/user/:userId/summary', [
     authenticateToken,
+    requireRole(['admin', 'project_manager']),
     param('userId').isInt().withMessage('Valid user ID required'),
     handleValidationErrors
 ], async (req, res) => {

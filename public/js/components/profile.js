@@ -111,8 +111,8 @@ const ProfileComponent = {
                         
                         <!-- REMOVED RECENT ACTIVITY CARD -->
                         
-                        <!-- Ratings (for contractors) -->
-                        ${['installation_company', 'operations'].includes(user.role) ? `
+                        <!-- Ratings - ONLY VISIBLE TO SELF IF PM/ADMIN -->
+                        ${this.shouldShowOwnRatings(user) ? `
                             <div class="card mt-3">
                                 <div class="card-header">
                                     <h5 class="card-title mb-0">My Ratings</h5>
@@ -126,6 +126,21 @@ const ProfileComponent = {
                 </div>
             </div>
         `;
+    },
+
+    shouldShowOwnRatings(user) {
+        // Only show ratings section if:
+        // 1. User is a PM or Admin (they can see ratings)
+        // 2. User is viewing their own profile
+        // 3. User is an installer/operations (has ratings to show)
+        const currentUser = State.getUser();
+        const isOwnProfile = currentUser && currentUser.id === user.id;
+        const canViewRatings = currentUser && 
+            (currentUser.role === 'admin' || currentUser.role === 'project_manager');
+        const hasRatings = ['installation_company', 'operations'].includes(user.role);
+        
+        // Show only if viewing own profile, has permission, and user type has ratings
+        return isOwnProfile && canViewRatings && hasRatings;
     },
 
     renderProfileForm(user) {

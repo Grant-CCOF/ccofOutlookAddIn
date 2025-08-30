@@ -502,7 +502,18 @@ const UserTemplates = {
     
     // Get user ratings card
     getUserRatingsCard(user, stats) {
-        if (!['installation_company', 'operations'].includes(user.role)) {
+        // Check if current user has permission to view ratings
+        const currentUser = State.getUser();
+        const canViewRatings = currentUser && 
+            (currentUser.role === 'admin' || currentUser.role === 'project_manager');
+        
+        // Don't show ratings card if user doesn't have permission
+        if (!canViewRatings) {
+            return '';
+        }
+        
+        // Don't show ratings for project managers (they don't get rated)
+        if (user.role === 'project_manager' || user.role === 'admin') {
             return '';
         }
         
@@ -521,10 +532,46 @@ const UserTemplates = {
                                 </div>
                                 <p class="text-muted">Based on ${stats.rating_count || 0} reviews</p>
                             </div>
+                            ${this.getRatingBreakdown(stats)}
                         </div>
                     ` : `
                         <p class="text-muted">No ratings yet</p>
                     `}
+                </div>
+            </div>
+        `;
+    },
+
+    getRatingBreakdown(stats) {
+        if (!stats.rating_breakdown) return '';
+        
+        return `
+            <div class="rating-breakdown mt-3">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <small class="text-muted">Price</small>
+                        <div class="rating-bar">
+                            ${Formatter.rating(stats.rating_breakdown.price || 0)}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <small class="text-muted">Speed</small>
+                        <div class="rating-bar">
+                            ${Formatter.rating(stats.rating_breakdown.speed || 0)}
+                        </div>
+                    </div>
+                    <div class="col-sm-6 mt-2">
+                        <small class="text-muted">Quality</small>
+                        <div class="rating-bar">
+                            ${Formatter.rating(stats.rating_breakdown.quality || 0)}
+                        </div>
+                    </div>
+                    <div class="col-sm-6 mt-2">
+                        <small class="text-muted">Responsiveness</small>
+                        <div class="rating-bar">
+                            ${Formatter.rating(stats.rating_breakdown.responsiveness || 0)}
+                        </div>
+                    </div>
                 </div>
             </div>
         `;

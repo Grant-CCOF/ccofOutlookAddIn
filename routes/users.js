@@ -376,12 +376,20 @@ router.get('/:id/stats', [
     handleValidationErrors
 ], async (req, res) => {
     try {
-        // Users can view their own stats, admins can view any
-        if (req.user.id !== parseInt(req.params.id) && req.user.role !== 'admin') {
+        const targetUserId = parseInt(req.params.id);
+        const requestingUser = req.user;
+        
+        // Check if user can view the stats
+        const isOwnProfile = requestingUser.id === targetUserId;
+        const isAdmin = requestingUser.role === 'admin';
+        const isProjectManager = requestingUser.role === 'project_manager';
+        
+        // Basic access check - users can view their own stats, admins can view any
+        if (!isOwnProfile && !isAdmin && !isProjectManager) {
             return res.status(403).json({ error: 'Access denied' });
         }
         
-        const user = await UserModel.getById(req.params.id);
+        const user = await UserModel.getById(targetUserId);
         
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -394,6 +402,7 @@ router.get('/:id/stats', [
             member_since: user.created_at
         };
         
+        // Add role-specific stats
         if (user.role === 'project_manager') {
             stats.projects_count = await ProjectModel.getCountByManager(user.id);
             stats.active_projects = await ProjectModel.getCountByManagerAndStatus(user.id, 'bidding');
@@ -402,8 +411,30 @@ router.get('/:id/stats', [
             stats.bids_count = await BidModel.getCountByUser(user.id);
             stats.won_bids = await BidModel.getCountByUserAndStatus(user.id, 'won');
             stats.win_rate = await BidModel.getWinRate(user.id);
-            stats.average_rating = await UserModel.getAverageRating(user.id);
-            stats.rating_count = await UserModel.getRatingCount(user.id);
+            
+            // RATING ACCESS CONTROL
+            // Only include ratings if the requesting user is admin or project manager
+            if (isAdmin || isProjectManager) {
+                stats.average_rating = await UserModel.getAverageRating(user.id);
+                stats.rating_count = await UserModel.getRatingCount(user.id);
+                
+                // Include detailed rating breakdown if available
+                const ratingDetails = await RatingModel.getAverageRatings(user.id);
+                if (ratingDetails && ratingDetails.count > 0) {
+                    stats.rating_breakdown = {
+                        price: ratingDetails.avg_price,
+                        speed: ratingDetails.avg_speed,
+                        quality: ratingDetails.avg_quality,
+                        responsiveness: ratingDetails.avg_responsiveness,
+                        customer_satisfaction: ratingDetails.avg_customer_satisfaction
+                    };
+                }
+            } else {
+                // For installers viewing their own profile, explicitly exclude ratings
+                stats.average_rating = null;
+                stats.rating_count = null;
+                stats.rating_breakdown = null;
+            }
         }
         
         res.json(stats);
@@ -411,6 +442,12 @@ router.get('/:id/stats', [
         logger.error('Error fetching user stats:', error);
         res.status(500).json({ error: 'Failed to fetch user statistics' });
     }
+});
+
+// Additional endpoint to check if user can view ratings
+router.get('/can-view-ratings', authenticateToken, (req, res) => {
+    const canViewRatings = req.user.role === 'admin' || req.user.role === 'project_manager';
+    res.json({ canViewRatings });
 });
 
 module.exports = router;

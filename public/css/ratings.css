@@ -1,0 +1,179 @@
+/* Rating Summary Card */
+.rating-summary {
+    padding: 20px;
+    text-align: center;
+}
+
+.rating-average h2 {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.rating-stars {
+    font-size: 1.5rem;
+    color: #ffc107;
+    margin: 10px 0;
+}
+
+.rating-stars .fa-star {
+    margin: 0 2px;
+}
+
+.rating-stars .fa-star.filled {
+    color: #ffc107;
+}
+
+.rating-stars .fa-star.empty {
+    color: #e0e0e0;
+}
+
+/* Rating Breakdown */
+.rating-breakdown {
+    border-top: 1px solid #e0e0e0;
+    padding-top: 15px;
+    margin-top: 20px;
+}
+
+.rating-breakdown .row > div {
+    padding: 5px 15px;
+}
+
+.rating-breakdown small {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.rating-bar {
+    display: flex;
+    align-items: center;
+}
+
+/* Rating Form Styles */
+.rating-form {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.rating-category {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.rating-category:last-of-type {
+    border-bottom: none;
+}
+
+.rating-category label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Star Rating Input */
+.star-rating {
+    display: flex;
+    gap: 5px;
+}
+
+.star-rating input[type="radio"] {
+    display: none;
+}
+
+.star-rating label {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #dee2e6;
+    transition: color 0.2s;
+    margin: 0;
+}
+
+.star-rating label:hover,
+.star-rating label:hover ~ label {
+    color: #ffc107;
+}
+
+.star-rating input[type="radio"]:checked ~ label {
+    color: #ffc107;
+}
+
+.star-rating input[type="radio"]:checked + label {
+    color: #ffc107;
+}
+
+/* Access Denied Message */
+.no-rating-access {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.no-rating-access i {
+    font-size: 3rem;
+    color: #dee2e6;
+    margin-bottom: 20px;
+}
+
+.no-rating-access h4 {
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.no-rating-access p {
+    margin: 0;
+}
+
+/* Rating Badge in User Lists */
+.user-rating-badge {
+    display: inline-flex;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.user-rating-badge .fa-star {
+    color: #ffc107;
+    margin-right: 4px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .rating-average h2 {
+        font-size: 2.5rem;
+    }
+    
+    .rating-stars {
+        font-size: 1.25rem;
+    }
+    
+    .rating-breakdown .row > div {
+        margin-bottom: 10px;
+    }
+}
+
+/* Permission-based visibility */
+.rating-restricted {
+    filter: blur(3px);
+    pointer-events: none;
+    user-select: none;
+}
+
+.rating-restricted::after {
+    content: "Restricted";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
