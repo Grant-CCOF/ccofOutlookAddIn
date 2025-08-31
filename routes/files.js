@@ -10,6 +10,8 @@ const fileService = require('../services/fileService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const logger = require('../utils/logger');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -335,10 +337,10 @@ router.get('/:id/download', [
         const file = await FileModel.getById(req.params.id);
         
         if (!file) {
-            return res.status(404).json({ error: 'File not found' });
+            return res.status(404).json({ error: 'File not found in database' });
         }
         
-        // Check access rights (same as above)
+        // Check access rights (keeping your existing logic)
         let hasAccess = false;
         
         if (req.user.role === 'admin') {
@@ -364,30 +366,94 @@ router.get('/:id/download', [
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Construct absolute path from relative path
-        const uploadDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
-        const absolutePath = path.join(uploadDir, file.file_path);
+        // Get the absolute file path
+        const absolutePath = await fileService.getFilePath(file.file_path);
         
-        // Check if file exists before attempting download
+        // Enhanced error checking with detailed logging
         try {
-            await fs.access(absolutePath);
+            // Check if file exists
+            await fs.access(absolutePath, fs.constants.F_OK);
+            logger.info(`File exists: ${absolutePath}`);
+            
+            // Check if file is readable
+            await fs.access(absolutePath, fs.constants.R_OK);
+            logger.info(`File is readable: ${absolutePath}`);
+            
+            // Get file stats for additional verification
+            const stats = await fs.stat(absolutePath);
+            logger.info(`File stats - Size: ${stats.size}, Mode: ${stats.mode.toString(8)}`);
+            
         } catch (err) {
-            logger.error(`File not found at path: ${absolutePath}`);
-            return res.status(404).json({ error: 'File not found on server' });
+            // Detailed error logging
+            logger.error(`File access error for path: ${absolutePath}`);
+            logger.error(`Error code: ${err.code}`);
+            logger.error(`Error message: ${err.message}`);
+            
+            // Check what's wrong
+            if (err.code === 'ENOENT') {
+                logger.error('File does not exist on filesystem');
+                return res.status(404).json({ 
+                    error: 'File not found on server',
+                    details: 'The file exists in database but not on filesystem',
+                    path: file.file_path // Don't expose absolute path to client
+                });
+            } else if (err.code === 'EACCES') {
+                logger.error('Permission denied to access file');
+                
+                // Log current process info for debugging
+                logger.error(`Process UID: ${process.getuid()}, GID: ${process.getgid()}`);
+                logger.error(`Process user: ${process.env.USER || 'unknown'}`);
+                
+                // Try to get file permissions for debugging
+                try {
+                    const stats = await fs.stat(absolutePath);
+                    logger.error(`File permissions: ${(stats.mode & parseInt('777', 8)).toString(8)}`);
+                    logger.error(`File owner UID: ${stats.uid}, GID: ${stats.gid}`);
+                } catch (statErr) {
+                    logger.error('Could not stat file for debugging');
+                }
+                
+                return res.status(500).json({ 
+                    error: 'Server configuration error',
+                    details: 'File exists but cannot be accessed. Please contact administrator.'
+                });
+            } else {
+                logger.error(`Unknown file access error: ${err.code}`);
+                return res.status(500).json({ 
+                    error: 'Failed to access file',
+                    details: 'An unexpected error occurred'
+                });
+            }
         }
         
-        // Send file with proper headers
-        res.download(absolutePath, file.original_name, (err) => {
-            if (err) {
-                logger.error('Error downloading file:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({ error: 'Failed to download file' });
-                }
+        // Use streaming for better performance and error handling
+        res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        res.setHeader('Content-Length', file.file_size);
+        
+        // Create read stream and pipe to response
+        const readStream = fsSync.createReadStream(absolutePath);
+        
+        readStream.on('error', (err) => {
+            logger.error('Error streaming file:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Failed to stream file' });
             }
         });
+        
+        readStream.on('open', () => {
+            logger.info(`Streaming file: ${file.original_name} to user ${req.user.id}`);
+        });
+        
+        readStream.on('end', () => {
+            logger.info(`File download completed: ${file.original_name}`);
+        });
+        
+        readStream.pipe(res);
+        
     } catch (error) {
-        logger.error('Error downloading file:', error);
-        res.status(500).json({ error: 'Failed to download file' });
+        logger.error('Unexpected error in download endpoint:', error);
+        res.status(500).json({ error: 'Failed to process download request' });
     }
 });
 

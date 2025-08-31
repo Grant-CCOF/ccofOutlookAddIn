@@ -879,12 +879,10 @@ const ProjectsComponent = {
                         </small>
                     </div>
                     <div class="file-actions">
-                        <a href="${API.files.download(file.id)}" 
-                           class="btn btn-sm btn-outline-primary"
-                           target="_blank"
-                           download="${fileName}">
+                        <button class="btn btn-sm btn-outline-primary"
+                                onclick="API.files.download(${file.id}, '${fileName.replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file'))">
                             <i class="fas fa-download"></i> Download
-                        </a>
+                        </button>
                     </div>
                 </div>
             </div>

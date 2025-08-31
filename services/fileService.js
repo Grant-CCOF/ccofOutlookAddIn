@@ -7,7 +7,13 @@ const logger = require('../utils/logger');
 class FileService {
     static getUploadPath(type = 'general') {
         // Use environment variable for upload directory, with fallback
-        const baseDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
+        let baseDir = process.env.UPLOAD_DIR || 'uploads';
+        
+        // If it's a relative path, resolve it relative to the project root
+        if (!path.isAbsolute(baseDir)) {
+            baseDir = path.join(process.cwd(), baseDir);
+        }
+        
         const typeDir = path.join(baseDir, type);
         return typeDir;
     }
@@ -20,18 +26,29 @@ class FileService {
     }
     
     static async ensureUploadDirectories() {
+        let baseDir = process.env.UPLOAD_DIR || 'uploads';
+        
+        // If it's a relative path, resolve it relative to the project root
+        if (!path.isAbsolute(baseDir)) {
+            baseDir = path.join(process.cwd(), baseDir);
+        }
+        
         const dirs = [
-            'uploads',
-            'uploads/projects',
-            'uploads/bids',
-            'uploads/avatars',
-            'uploads/temp'
+            baseDir,
+            path.join(baseDir, 'projects'),
+            path.join(baseDir, 'bids'),
+            path.join(baseDir, 'avatars'),
+            path.join(baseDir, 'temp')
         ];
         
         for (const dir of dirs) {
-            const dirPath = path.join(process.cwd(), dir);
             try {
-                await fs.mkdir(dirPath, { recursive: true });
+                // Create directory with proper permissions
+                await fs.mkdir(dir, { recursive: true, mode: 0o755 });
+                
+                // Ensure permissions are set correctly
+                await fs.chmod(dir, 0o755);
+                
                 logger.info(`Upload directory ensured: ${dir}`);
             } catch (error) {
                 logger.error(`Error creating directory ${dir}:`, error);
@@ -45,14 +62,33 @@ class FileService {
             const fileName = this.generateFileName(file.originalname);
             const absolutePath = path.join(uploadPath, fileName);
             
-            // Ensure directory exists
-            await fs.mkdir(uploadPath, { recursive: true });
+            // Ensure directory exists with proper permissions
+            await fs.mkdir(uploadPath, { recursive: true, mode: 0o755 });
             
             // Save the actual file
             if (file.buffer) {
-                await fs.writeFile(absolutePath, file.buffer);
+                // Write file with explicit permissions
+                await fs.writeFile(absolutePath, file.buffer, { mode: 0o644 });
             } else if (file.path) {
+                // Move uploaded file
                 await fs.rename(file.path, absolutePath);
+                // Set proper permissions after moving
+                await fs.chmod(absolutePath, 0o644);
+            }
+            
+            // Verify the file was saved and is readable
+            try {
+                await fs.access(absolutePath, fs.constants.R_OK);
+                logger.info(`File saved successfully: ${absolutePath}`);
+            } catch (accessError) {
+                logger.error(`File saved but not readable: ${absolutePath}`, accessError);
+                // Try to fix permissions
+                try {
+                    await fs.chmod(absolutePath, 0o644);
+                    logger.info(`Fixed permissions for: ${absolutePath}`);
+                } catch (chmodError) {
+                    logger.error(`Could not fix permissions: ${absolutePath}`, chmodError);
+                }
             }
             
             // Store RELATIVE path in database (e.g., "bids/filename.pdf")
@@ -70,24 +106,34 @@ class FileService {
             throw error;
         }
     }
+
+    static async getFilePath(relativePath) {
+        // Get the base upload directory
+        let uploadDir = process.env.UPLOAD_DIR || 'uploads';
+        
+        // If it's a relative path, resolve it relative to the project root
+        if (!path.isAbsolute(uploadDir)) {
+            uploadDir = path.join(process.cwd(), uploadDir);
+        }
+        
+        // Construct the absolute path
+        return path.join(uploadDir, relativePath);
+    }
     
     static async deleteFile(filePath) {
         try {
-            // If it's a relative path, convert to absolute
-            const uploadDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
-            const absolutePath = path.isAbsolute(filePath) 
-                ? filePath 
-                : path.join(uploadDir, filePath);
+            const absolutePath = await this.getFilePath(filePath);
                 
-            await fs.unlink(absolutePath);
-            logger.info(`File deleted: ${absolutePath}`);
-            return true;
-        } catch (error) {
-            if (error.code === 'ENOENT') {
+            // Check if file exists before deleting
+            try {
+                await fs.access(absolutePath);
+                await fs.unlink(absolutePath);
+                logger.info(`File deleted: ${absolutePath}`);
+            } catch (err) {
                 logger.warn(`File not found for deletion: ${absolutePath}`);
-                return false;
             }
-            logger.error(`Error deleting file:`, error);
+        } catch (error) {
+            logger.error('Error deleting file:', error);
             throw error;
         }
     }
