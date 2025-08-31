@@ -679,12 +679,10 @@ const BidsComponent = {
                             <span>${file.original_name || file.name}</span>
                             <small class="text-muted ml-2">(${this.formatFileSize(file.size || file.file_size)})</small>
                         </div>
-                        <a href="${API.files.download(file.id)}" 
-                        class="btn btn-sm btn-primary" 
-                        target="_blank"
-                        download="${file.original_name || file.name}">
+                        <button class="btn btn-sm btn-primary" 
+                                onclick="API.files.download(${file.id}, '${(file.original_name || file.name)}').catch(err => App.showError('Failed to download file'))">
                             <i class="fas fa-download"></i> Download
-                        </a>
+                        </button>
                     </div>
                 `).join('')}
             </div>

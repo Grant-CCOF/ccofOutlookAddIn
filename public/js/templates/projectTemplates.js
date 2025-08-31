@@ -385,7 +385,7 @@ const ProjectTemplates = {
                 </div>
                 <div class="file-details">
                     <div class="file-name">
-                        <a href="${API.files.download(file.id)}" target="_blank">
+                        <a href="#" onclick="event.preventDefault(); API.files.download(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file')); return false;">
                             ${file.original_name || file.name}
                         </a>
                     </div>
@@ -398,7 +398,7 @@ const ProjectTemplates = {
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-icon" onclick="FileUpload.downloadFile(${JSON.stringify(file).replace(/"/g, '&quot;')})">
+                    <button class="btn-icon" onclick="API.files.download(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file'))">
                         <i class="fas fa-download"></i>
                     </button>
                     ${State.getUserId() === file.uploaded_by ? `

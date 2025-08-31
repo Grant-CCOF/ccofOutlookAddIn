@@ -363,12 +363,26 @@ router.get('/:id/download', [
         if (!hasAccess) {
             return res.status(403).json({ error: 'Access denied' });
         }
+
+        // Construct absolute path from relative path
+        const uploadDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
+        const absolutePath = path.join(uploadDir, file.file_path);
         
-        // Send file
-        res.download(file.file_path, file.original_name, (err) => {
+        // Check if file exists before attempting download
+        try {
+            await fs.access(absolutePath);
+        } catch (err) {
+            logger.error(`File not found at path: ${absolutePath}`);
+            return res.status(404).json({ error: 'File not found on server' });
+        }
+        
+        // Send file with proper headers
+        res.download(absolutePath, file.original_name, (err) => {
             if (err) {
                 logger.error('Error downloading file:', err);
-                res.status(500).json({ error: 'Failed to download file' });
+                if (!res.headersSent) {
+                    res.status(500).json({ error: 'Failed to download file' });
+                }
             }
         });
     } catch (error) {

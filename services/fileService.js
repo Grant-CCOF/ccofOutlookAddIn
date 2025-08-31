@@ -6,7 +6,8 @@ const logger = require('../utils/logger');
 
 class FileService {
     static getUploadPath(type = 'general') {
-        const baseDir = path.join(process.cwd(), 'uploads');
+        // Use environment variable for upload directory, with fallback
+        const baseDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
         const typeDir = path.join(baseDir, type);
         return typeDir;
     }
@@ -42,26 +43,27 @@ class FileService {
         try {
             const uploadPath = this.getUploadPath(type);
             const fileName = this.generateFileName(file.originalname);
-            const filePath = path.join(uploadPath, fileName);
+            const absolutePath = path.join(uploadPath, fileName);
             
             // Ensure directory exists
             await fs.mkdir(uploadPath, { recursive: true });
             
-            // Move file from temp location (for multer memory storage)
+            // Save the actual file
             if (file.buffer) {
-                await fs.writeFile(filePath, file.buffer);
+                await fs.writeFile(absolutePath, file.buffer);
             } else if (file.path) {
-                // Move file from temp location (for multer disk storage)
-                await fs.rename(file.path, filePath);
+                await fs.rename(file.path, absolutePath);
             }
             
-            // Return with snake_case property names to match database schema
+            // Store RELATIVE path in database (e.g., "bids/filename.pdf")
+            const relativePath = path.join(type, fileName);
+            
             return {
-                original_name: file.originalname,  // Changed from originalName
-                file_name: fileName,                // Changed from fileName
-                file_path: filePath,                // Changed from filePath
-                file_size: file.size,               // Changed from fileSize
-                mime_type: file.mimetype            // Changed from mimeType
+                original_name: file.originalname,
+                file_name: fileName,
+                file_path: relativePath,  // Store relative path, not absolute
+                file_size: file.size,
+                mime_type: file.mimetype
             };
         } catch (error) {
             logger.error('Error saving file:', error);
@@ -71,15 +73,21 @@ class FileService {
     
     static async deleteFile(filePath) {
         try {
-            await fs.unlink(filePath);
-            logger.info(`File deleted: ${filePath}`);
+            // If it's a relative path, convert to absolute
+            const uploadDir = process.env.UPLOAD_DIR || '/opt/capital-choice/uploads';
+            const absolutePath = path.isAbsolute(filePath) 
+                ? filePath 
+                : path.join(uploadDir, filePath);
+                
+            await fs.unlink(absolutePath);
+            logger.info(`File deleted: ${absolutePath}`);
             return true;
         } catch (error) {
             if (error.code === 'ENOENT') {
-                logger.warn(`File not found for deletion: ${filePath}`);
+                logger.warn(`File not found for deletion: ${absolutePath}`);
                 return false;
             }
-            logger.error(`Error deleting file ${filePath}:`, error);
+            logger.error(`Error deleting file:`, error);
             throw error;
         }
     }

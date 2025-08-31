@@ -323,7 +323,37 @@ API.files = {
     upload: (file, data) => API.upload('/files/upload', file, data),
     uploadMultiple: (files, data) => API.uploadMultiple('/files/multiple', files, data),
     getById: (id) => API.get(`/files/${id}`),
-    download: (id) => `${Config.API_BASE_URL}/files/${id}/download`,
+    getDownloadUrl: (id) => `${Config.API_BASE_URL}/files/${id}/download`,
+    download: async (id, filename) => {
+        try {
+            const response = await fetch(`${Config.API_BASE_URL}/files/${id}/download`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${Auth.getToken()}`
+                }
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Download failed');
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            return true;
+        } catch (error) {
+            console.error('Download error:', error);
+            throw error;
+        }
+    },
     delete: (id) => API.delete(`/files/${id}`),
     getProjectFiles: (projectId) => API.get(`/files/project/${projectId}/list`),
     getBidFiles: (bidId) => API.get(`/files/bid/${bidId}/list`)

@@ -561,14 +561,57 @@ const FileUpload = {
         return icons[extension] || 'fa-file';
     },
     
-    // Download file
-    downloadFile(file) {
-        const downloadUrl = API.files.download(file.id);
-        
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = file.original_name || file.name;
-        link.click();
+    // Download file with authentication
+    async downloadFile(file) {
+        try {
+            // Show loading indicator
+            App.showLoading('Downloading file...');
+            
+            const response = await fetch(`${Config.API_BASE_URL}/files/${file.id}/download`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${Auth.getToken()}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Download failed');
+            }
+            
+            // Get the filename from response headers or use the original name
+            const contentDisposition = response.headers.get('content-disposition');
+            let filename = file.original_name || file.name;
+            
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+            
+            // Convert response to blob
+            const blob = await response.blob();
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            App.hideLoading();
+            App.showSuccess('File downloaded successfully');
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            App.hideLoading();
+            App.showError('Failed to download file');
+        }
     },
     
     // Delete file
