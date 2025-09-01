@@ -356,7 +356,17 @@ API.files = {
     },
     delete: (id) => API.delete(`/files/${id}`),
     getProjectFiles: (projectId) => API.get(`/files/project/${projectId}/list`),
-    getBidFiles: (bidId) => API.get(`/files/bid/${bidId}/list`)
+    getBidFiles: (bidId) => API.get(`/files/bid/${bidId}/list`),
+    uploadCertification: (file, description) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (description) {
+            formData.append('description', description);
+        }
+        return API.upload('/files/certification', file, { description });
+    },
+    getUserCertifications: (userId) => API.get(`/files/user/${userId}/certifications`),
+    deleteCertification: (id) => API.delete(`/files/certification/${id}`)
 };
 
 API.ratings = {

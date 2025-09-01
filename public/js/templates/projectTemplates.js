@@ -374,9 +374,10 @@ const ProjectTemplates = {
         `;
     },
     
+
     // Get file item template
     getFileItem(file) {
-        const icon = FileUpload.getFileIcon(file.name);
+        const icon = FileUpload.getFileIcon(file.original_name || file.name);
         
         return `
             <div class="file-item" data-file-id="${file.id}">
@@ -385,7 +386,7 @@ const ProjectTemplates = {
                 </div>
                 <div class="file-details">
                     <div class="file-name">
-                        <a href="#" onclick="event.preventDefault(); API.files.download(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file')); return false;">
+                        <a href="#" onclick="event.preventDefault(); ProjectsComponent.downloadFile(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}'); return false;">
                             ${file.original_name || file.name}
                         </a>
                     </div>
@@ -398,7 +399,7 @@ const ProjectTemplates = {
                     </div>
                 </div>
                 <div class="file-actions">
-                    <button class="btn-icon" onclick="API.files.download(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file'))">
+                    <button class="btn-icon" onclick="event.preventDefault(); ProjectsComponent.downloadFile(${file.id}, '${(file.original_name || file.name).replace(/'/g, "\\'")}'); return false;">
                         <i class="fas fa-download"></i>
                     </button>
                     ${State.getUserId() === file.uploaded_by ? `

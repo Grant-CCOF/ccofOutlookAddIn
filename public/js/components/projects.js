@@ -889,6 +889,15 @@ const ProjectsComponent = {
         `;
     },
 
+    async downloadFile(fileId, filename) {
+        try {
+            await API.files.download(fileId, filename);
+        } catch (error) {
+            console.error('Download error:', error);
+            App.showError('Failed to download file');
+        }
+    },
+
     getFileIcon(filename) {
         const ext = filename.split('.').pop().toLowerCase();
         const iconMap = {

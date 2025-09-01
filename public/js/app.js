@@ -312,6 +312,30 @@ const App = {
             return;
         }
         
+        // Add password toggle functionality
+        const toggleButton = loginForm.querySelector('.toggle-password');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = toggleButton.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                const icon = toggleButton.querySelector('i');
+                
+                if (passwordInput) {
+                    // Toggle input type
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        icon.classList.remove('fa-eye');
+                        icon.classList.add('fa-eye-slash');
+                    } else {
+                        passwordInput.type = 'password';
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                }
+            });
+        }
+        
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -329,7 +353,7 @@ const App = {
         
         loginForm.dataset.initialized = 'true';
     },
-    
+        
     // Check for remembered credentials
     checkRememberedCredentials() {
         const rememberMe = localStorage.getItem('rememberMe') === 'true';

@@ -292,20 +292,19 @@ const BidTemplates = {
     
     // Get file template
     getFileTemplate(file) {
-        const icon = FileUpload.getFileIcon(file.filename);
+        const icon = FileUpload.getFileIcon(file.original_name || file.filename || file.name);
         
         return `
             <div class="file-item">
                 <div class="file-info">
                     <i class="${icon}"></i>
-                    <span class="file-name">${file.original_name || file.filename}</span>
-                    <span class="file-size">${Formatter.fileSize(file.size)}</span>
+                    <span class="file-name">${file.original_name || file.filename || file.name}</span>
+                    <span class="file-size">${Formatter.fileSize(file.size || file.file_size)}</span>
                 </div>
-                <a href="/api/files/download/${file.id}" 
-                   class="btn btn-sm btn-outline"
-                   target="_blank">
+                <button class="btn btn-sm btn-outline"
+                        onclick="event.preventDefault(); BidsComponent.downloadFile(${file.id}, '${(file.original_name || file.filename || file.name).replace(/'/g, "\\'")}'); return false;">
                     <i class="fas fa-download"></i> Download
-                </a>
+                </button>
             </div>
         `;
     },

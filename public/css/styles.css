@@ -2469,3 +2469,64 @@ body.sidebar-collapsed .main-content {
         margin-top: 0.5rem;
     }
 }
+
+/* Password error messages */
+.form-group small.text-danger {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    display: block;
+}
+
+/* Disabled button state */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Modal sizes */
+.modal-dialog.modal-md {
+    max-width: 500px;
+}
+
+/* Alert in modal */
+.modal-body .alert {
+    margin-bottom: 0;
+}
+
+/* Password field styling */
+input[type="password"]:invalid {
+    border-color: #dc3545;
+}
+
+input[type="password"]:valid {
+    border-color: #28a745;
+}
+
+/* Certifications */
+.certifications-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.certification-item {
+    background: var(--light-gray);
+    transition: background-color 0.2s;
+}
+
+.certification-item:hover {
+    background: var(--light-blue);
+}
+
+.certification-item .btn-group {
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.certification-item:hover .btn-group {
+    opacity: 1;
+}
+
+/* File type icons colors */
+.fa-file-pdf { color: #dc3545; }
+.fa-file-word { color: #007bff; }
+.fa-file-image { color: #28a745; }

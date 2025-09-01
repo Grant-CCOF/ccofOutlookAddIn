@@ -114,6 +114,31 @@ class FileModel {
         const sql = `DELETE FROM files WHERE bid_id = ?`;
         return db.run(sql, [bidId]);
     }
+
+    static async getUserCertifications(userId) {
+        const sql = `
+            SELECT f.*, 
+                u.name as uploaded_by_name, 
+                u.username as uploaded_by_username
+            FROM files f
+            LEFT JOIN users u ON f.uploaded_by = u.id
+            WHERE f.user_id = ? AND f.file_type = 'certification'
+            ORDER BY f.created_at DESC
+        `;
+        
+        const files = await db.all(sql, [userId]);
+        
+        return files.map(file => ({
+            ...file,
+            uploader_display: file.uploaded_by_name || file.uploaded_by_username || 'Unknown'
+        }));
+    }
+
+    static async deleteUserCertification(fileId, userId) {
+        // Only allow users to delete their own certifications (or admin)
+        const sql = `DELETE FROM files WHERE id = ? AND user_id = ? AND file_type = 'certification'`;
+        return db.run(sql, [fileId, userId]);
+    }
 }
 
 module.exports = FileModel;

@@ -680,13 +680,31 @@ const BidsComponent = {
                             <small class="text-muted ml-2">(${this.formatFileSize(file.size || file.file_size)})</small>
                         </div>
                         <button class="btn btn-sm btn-primary" 
-                                onclick="API.files.download(${file.id}, '${(file.original_name || file.name)}').catch(err => App.showError('Failed to download file'))">
+                                data-file-id="${file.id}"
+                                data-file-name="${(file.original_name || file.name).replace(/"/g, '&quot;')}"
+                                onclick="event.preventDefault(); BidsComponent.downloadFileFromButton(this); return false;">
                             <i class="fas fa-download"></i> Download
                         </button>
                     </div>
                 `).join('')}
             </div>
         `;
+    },
+
+    // Add this companion method:
+    downloadFileFromButton(button) {
+        const fileId = parseInt(button.getAttribute('data-file-id'));
+        const fileName = button.getAttribute('data-file-name');
+        this.downloadFile(fileId, fileName);
+    },
+
+    async downloadFile(fileId, filename) {
+        try {
+            await API.files.download(fileId, filename);
+        } catch (error) {
+            console.error('Download error:', error);
+            App.showError('Failed to download file');
+        }
     },
 
     getFileIcon(filename) {

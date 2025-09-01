@@ -119,6 +119,19 @@ class ProjectModel {
     }
     
     static async update(id, updates) {
+        // Handle JSON fields
+        if (updates.site_conditions !== undefined) {
+            updates.site_conditions = JSON.stringify(updates.site_conditions || []);
+        }
+        if (updates.custom_fields !== undefined) {
+            updates.custom_fields = JSON.stringify(updates.custom_fields || {});
+        }
+        
+        // Handle boolean to integer conversion for SQLite
+        if (updates.show_max_bid !== undefined) {
+            updates.show_max_bid = updates.show_max_bid ? 1 : 0;
+        }
+        
         const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
         const values = Object.values(updates);
         values.push(id);

@@ -582,6 +582,17 @@ const UsersComponent = {
             </tr>
         `;
     },
+
+    // View user profile with certifications
+    async viewUserProfile(userId) {
+        try {
+            // Use the ProfileComponent to render another user's profile
+            await ProfileComponent.render(userId);
+            Router.navigate(`/users/${userId}/profile`);
+        } catch (error) {
+            App.showError('Failed to load user profile');
+        }
+    },
     
     // Get user status
     getUserStatus(user) {

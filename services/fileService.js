@@ -38,6 +38,7 @@ class FileService {
             path.join(baseDir, 'projects'),
             path.join(baseDir, 'bids'),
             path.join(baseDir, 'avatars'),
+            path.join(baseDir, 'certifications'),
             path.join(baseDir, 'temp')
         ];
         

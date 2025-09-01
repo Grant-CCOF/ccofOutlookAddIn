@@ -565,4 +565,100 @@ router.get('/bid/:bidId/list', [
     }
 });
 
+// Upload certification for user profile
+router.post('/certification', [
+    authenticateToken,
+    upload.single('file'),
+    body('description').optional().isString(),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+        
+        const { description } = req.body;
+        
+        // Validate file type (only allow certain types for certifications)
+        const allowedCertTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+        const ext = path.extname(req.file.originalname).toLowerCase();
+        
+        if (!allowedCertTypes.includes(ext)) {
+            return res.status(400).json({ 
+                error: 'Invalid file type. Certifications must be PDF, JPG, PNG, DOC, or DOCX' 
+            });
+        }
+        
+        // Save file
+        const fileData = await fileService.saveFile(req.file, 'certifications');
+        
+        // Create database record
+        const fileId = await FileModel.create({
+            ...fileData,
+            uploaded_by: req.user.id,
+            user_id: req.user.id,
+            file_type: 'certification',
+            description: description || null
+        });
+        
+        const file = await FileModel.getById(fileId);
+        
+        logger.info(`Certification uploaded for user ${req.user.id}: ${file.original_name}`);
+        
+        res.status(201).json(file);
+    } catch (error) {
+        logger.error('Error uploading certification:', error);
+        res.status(500).json({ error: 'Failed to upload certification' });
+    }
+});
+
+// Get user certifications
+router.get('/user/:userId/certifications', [
+    authenticateToken,
+    param('userId').isInt().withMessage('Valid user ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const certifications = await FileModel.getUserCertifications(req.params.userId);
+        
+        res.json(certifications);
+    } catch (error) {
+        logger.error('Error fetching user certifications:', error);
+        res.status(500).json({ error: 'Failed to fetch certifications' });
+    }
+});
+
+// Delete certification
+router.delete('/certification/:id', [
+    authenticateToken,
+    param('id').isInt().withMessage('Valid file ID required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const file = await FileModel.getById(req.params.id);
+        
+        if (!file) {
+            return res.status(404).json({ error: 'Certification not found' });
+        }
+        
+        // Check ownership (only owner or admin can delete)
+        if (file.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        // Delete file from filesystem
+        await fileService.deleteFile(file.file_path);
+        
+        // Delete from database
+        await FileModel.delete(req.params.id);
+        
+        logger.info(`Certification deleted: ${file.original_name} by user ${req.user.id}`);
+        
+        res.json({ message: 'Certification deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting certification:', error);
+        res.status(500).json({ error: 'Failed to delete certification' });
+    }
+});
+
 module.exports = router;

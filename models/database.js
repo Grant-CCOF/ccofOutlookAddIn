@@ -171,10 +171,14 @@ class Database {
                 uploaded_by INTEGER NOT NULL,
                 project_id INTEGER,
                 bid_id INTEGER,
+                user_id INTEGER,
+                file_type TEXT DEFAULT 'general',
+                description TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (uploaded_by) REFERENCES users(id),
                 FOREIGN KEY (project_id) REFERENCES projects(id),
-                FOREIGN KEY (bid_id) REFERENCES bids(id)
+                FOREIGN KEY (bid_id) REFERENCES bids(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )`,
             
             `CREATE TABLE IF NOT EXISTS ratings (
