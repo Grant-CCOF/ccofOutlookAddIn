@@ -926,23 +926,16 @@ const ProjectsComponent = {
             </div>
         `;
         
-        Modal.show({
-            title: 'Confirm Deletion',
-            body: modalContent,
-            size: 'medium',
-            buttons: [
-                {
-                    text: 'Cancel',
-                    class: 'btn-outline',
-                    handler: () => Modal.hide()
-                },
-                {
-                    text: 'Delete Project',
-                    class: 'btn-danger',
-                    handler: () => this.deleteProject(projectId)
-                }
-            ]
-        });
+        const modalId = ProjectModals.createModal(
+            'Confirm Deletion',
+            modalContent,
+            {
+                size: 'medium',
+                confirmText: 'Delete Project',
+                cancelText: 'Cancel',
+                onConfirm: `ProjectsComponent.deleteProject(${projectId})`
+            }
+        );
     },
 
     // Delete project
@@ -952,13 +945,23 @@ const ProjectsComponent = {
             
             const response = await API.projects.delete(projectId);
             
-            Modal.hide();
+            // Use ProjectModals.closeModal instead of Modal.hide
+            ProjectModals.closeModal();
             
             App.showSuccess(`Project "${response.deletedProject.title}" has been deleted successfully`);
             
-            // Remove from state and re-render
+            // Remove from state
             this.state.projects = this.state.projects.filter(p => p.id !== projectId);
-            await this.loadProjects();
+            
+            // Check if we're on the project detail page
+            const currentHash = window.location.hash;
+            if (currentHash.includes(`/projects/${projectId}`)) {
+                // Navigate to projects list page
+                Router.navigate('/projects');
+            } else {
+                // We're already on the projects list, just reload
+                await this.loadProjects();
+            }
             
         } catch (error) {
             Config.error('Failed to delete project:', error);

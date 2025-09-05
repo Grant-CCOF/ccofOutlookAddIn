@@ -102,26 +102,43 @@ const BidsComponent = {
     getContractorLayout() {
         return `
             <div class="bids-container">
-                <!-- Tabs -->
-                <div class="card">
-                    <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-tab="active">Active Bids</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="won">Won Bids</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="lost">Lost Bids</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-tab="all">All Bids</a>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div class="card-body">
+                <!-- Apple-Style Tabs (matching project menu) -->
+                <div class="apple-tabs-container">
+                    <ul class="apple-tabs">
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link active" data-tab="active">
+                                <i class="fas fa-clock tab-icon"></i>
+                                <span>Active Bids</span>
+                                <span class="apple-tab-badge" id="activeBidsCount">0</span>
+                            </button>
+                        </li>
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link" data-tab="won">
+                                <i class="fas fa-trophy tab-icon"></i>
+                                <span>Won Bids</span>
+                                <span class="apple-tab-badge" id="wonBidsCount">0</span>
+                            </button>
+                        </li>
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link" data-tab="lost">
+                                <i class="fas fa-times-circle tab-icon"></i>
+                                <span>Lost Bids</span>
+                                <span class="apple-tab-badge" id="lostBidsCount">0</span>
+                            </button>
+                        </li>
+                        <li class="apple-tab-item">
+                            <button class="apple-tab-link" data-tab="all">
+                                <i class="fas fa-list tab-icon"></i>
+                                <span>All Bids</span>
+                                <span class="apple-tab-badge" id="allBidsCount">0</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Tab Content -->
+                <div class="apple-tab-content">
+                    <div class="apple-tab-pane active" data-tab-content="active">
                         <div id="bidsList" class="bid-list">
                             <!-- Bids will be loaded here -->
                         </div>
@@ -146,11 +163,20 @@ const BidsComponent = {
     
     // Initialize event listeners
     initializeEventListeners() {
-        // Tab switching for contractors
-        document.querySelectorAll('.nav-link[data-tab]').forEach(tab => {
+        // Tab switching for contractors with Apple-style tabs
+        document.querySelectorAll('.apple-tab-link[data-tab]').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.switchTab(e.target.dataset.tab);
+                const tabName = tab.dataset.tab;
+                
+                // Update active states for tabs
+                document.querySelectorAll('.apple-tab-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                tab.classList.add('active');
+                
+                // Switch the content (reusing existing switchTab logic)
+                this.switchTab(tabName);
             });
         });
         
@@ -175,29 +201,61 @@ const BidsComponent = {
     // Load bids
     async loadBids() {
         try {
-            const user = State.getUser();
-            let bids;
+            const response = await API.bids.getMyBids();
+            this.state.bids = response;
             
-            if (user.role === 'admin' || user.role === 'project_manager') {
-                // Load all bids for projects managed by this user
-                bids = await this.loadManagerBids();
-            } else {
-                // Load user's own bids
-                bids = await API.bids.getMyBids(this.state.filters);
-            }
+            // Update counts after loading bids
+            this.updateBidCounts();
             
-            this.state.bids = bids;
-            this.renderBids();
-            
-            // Load available projects for contractors
-            if (['installation_company', 'operations'].includes(user.role)) {
-                await this.loadAvailableProjects();
-            }
-            
+            // Render based on current tab
+            const activeTab = document.querySelector('.apple-tab-link.active')?.dataset.tab || 'active';
+            this.switchTab(activeTab);
         } catch (error) {
             Config.error('Failed to load bids:', error);
+            this.state.bids = [];
+            this.updateBidCounts(); // Update counts even on error
             this.renderEmptyState();
         }
+    },
+
+    renderEmptyState() {
+        const activeTab = document.querySelector('.apple-tab-link.active')?.dataset.tab || 'active';
+        
+        const messages = {
+            active: {
+                icon: 'fa-clock',
+                title: 'No Active Bids',
+                message: 'You don\'t have any pending bids at the moment.'
+            },
+            won: {
+                icon: 'fa-trophy',
+                title: 'No Won Bids',
+                message: 'You haven\'t won any bids yet. Keep bidding!'
+            },
+            lost: {
+                icon: 'fa-times-circle',
+                title: 'No Lost Bids',
+                message: 'You haven\'t lost any bids. That\'s great!'
+            },
+            all: {
+                icon: 'fa-list',
+                title: 'No Bids',
+                message: 'You haven\'t placed any bids yet.'
+            }
+        };
+        
+        const state = messages[activeTab] || messages.all;
+        
+        return `
+            <div class="empty-state">
+                <i class="fas ${state.icon} fa-3x text-muted mb-3"></i>
+                <h4>${state.title}</h4>
+                <p class="text-muted">${state.message}</p>
+                <a href="#/projects" class="btn btn-primary mt-3">
+                    <i class="fas fa-search"></i> Browse Projects
+                </a>
+            </div>
+        `;
     },
     
     // Load manager bids
@@ -243,13 +301,16 @@ const BidsComponent = {
     },
     
     // Render bids
-    renderBids() {
+    renderBids(filteredBids = null) {
         const user = State.getUser();
         
         if (user.role === 'admin' || user.role === 'project_manager') {
+            // For managers, we don't use tabs, so ignore filtered bids
             this.renderManagerBids();
         } else {
-            this.renderContractorBids();
+            // For contractors, use filtered bids if provided, otherwise use all bids
+            const bidsToRender = filteredBids || this.state.bids;
+            this.renderContractorBids(bidsToRender);
         }
     },
     
@@ -305,19 +366,105 @@ const BidsComponent = {
     },
     
     // Render contractor bids
-    renderContractorBids() {
+    renderContractorBids(bidsToRender = null) {
         const container = DOM.get('bidsList');
-        
         if (!container) return;
         
-        if (this.state.bids.length === 0) {
-            container.innerHTML = this.getEmptyBidsMessage();
+        // Use provided bids or fall back to state.bids
+        const bids = bidsToRender || this.state.bids;
+        
+        if (!bids || bids.length === 0) {
+            container.innerHTML = this.renderEmptyState();
             return;
         }
         
-        container.innerHTML = this.state.bids.map(bid => 
-            this.renderBidCard(bid)
-        ).join('');
+        container.innerHTML = bids.map(bid => {
+            const statusColor = this.getStatusColor(bid.status);
+            const bidId = bid.id;
+            const hasFiles = bid.files && bid.files.length > 0;
+            
+            return `
+                <div class="bid-card" data-bid-id="${bidId}">
+                    <div class="bid-header">
+                        <h4 class="bid-title">${bid.project_title || 'Project #' + bid.project_id}</h4>
+                        <span class="badge badge-${statusColor}">${bid.status}</span>
+                    </div>
+                    
+                    <div class="bid-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p class="mb-2">
+                                    <strong>Amount:</strong> ${Formatter.currency(bid.amount)}
+                                </p>
+                                <p class="mb-2">
+                                    <strong>Submitted:</strong> ${Formatter.date(bid.created_at)}
+                                </p>
+                                ${bid.project_delivery_date ? `
+                                    <p class="mb-2">
+                                        <strong>Project Delivery:</strong> ${Formatter.date(bid.project_delivery_date)}
+                                    </p>
+                                ` : ''}
+                                ${bid.comments ? `
+                                    <p class="mb-2"><strong>Comments:</strong> ${bid.comments}</p>
+                                ` : ''}
+                            </div>
+                            <div class="col-md-4 text-right">
+                                <button class="btn btn-primary btn-sm" onclick="BidsComponent.viewBidDetails(${bidId})">
+                                    <i class="fas fa-eye"></i> View Details
+                                </button>
+                                ${bid.status === 'pending' ? `
+                                    <button class="btn btn-warning btn-sm ml-2" onclick="BidsComponent.editBid(${bidId})">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-danger btn-sm ml-2" onclick="BidsComponent.withdrawBid(${bidId})">
+                                        <i class="fas fa-times"></i> Withdraw
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- Files dropdown section -->
+                        ${hasFiles ? `
+                            <div class="bid-files-section mt-3">
+                                <button class="btn btn-outline-secondary btn-sm" 
+                                        type="button" 
+                                        data-toggle="collapse" 
+                                        data-target="#bidFiles${bidId}"
+                                        onclick="this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-up');">
+                                    <i class="fas fa-chevron-down"></i> 
+                                    Attachments (${bid.files.length})
+                                </button>
+                                <div class="collapse mt-2" id="bidFiles${bidId}">
+                                    <div class="card card-body">
+                                        ${this.renderBidFiles(bid.files)}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="bid-files-section mt-3">
+                                <p class="text-muted mb-0">
+                                    <i class="fas fa-paperclip"></i> No files uploaded with this bid
+                                </p>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    // Helper function to get status color for badges
+    getStatusColor(status) {
+        const colors = {
+            'pending': 'warning',     // Yellow/Orange - waiting for decision
+            'won': 'success',          // Green - bid was accepted
+            'lost': 'danger',          // Red - bid was not selected
+            'withdrawn': 'secondary',  // Gray - bid was withdrawn
+            'active': 'primary',       // Blue - actively being considered
+            'expired': 'dark'          // Dark gray - bid expired
+        };
+        
+        return colors[status.toLowerCase()] || 'secondary';
     },
     
     // Render bid card
@@ -447,8 +594,8 @@ const BidsComponent = {
     
     // Switch tab
     switchTab(tab) {
-        // Update nav
-        document.querySelectorAll('.nav-link[data-tab]').forEach(link => {
+        // Update nav with Apple-style tabs
+        document.querySelectorAll('.apple-tab-link[data-tab]').forEach(link => {
             link.classList.toggle('active', link.dataset.tab === tab);
         });
         
@@ -465,20 +612,50 @@ const BidsComponent = {
             case 'lost':
                 filteredBids = filteredBids.filter(b => b.status === 'lost');
                 break;
-            // 'all' shows everything
+            case 'all':
+                // Show all bids
+                break;
         }
         
+        // Update bid counts in badges
+        this.updateBidCounts();
+        
         // Render filtered bids
-        const container = DOM.get('bidsList');
-        if (container) {
-            if (filteredBids.length === 0) {
-                container.innerHTML = this.getEmptyBidsMessage();
-            } else {
-                container.innerHTML = filteredBids.map(bid => 
-                    this.renderBidCard(bid)
-                ).join('');
-            }
-        }
+        this.renderBids(filteredBids);
+    },
+
+    updateBidCounts() {
+        const bids = this.state.bids;
+        
+        // Count bids by status
+        const activeBids = bids.filter(b => b.status === 'pending').length;
+        const wonBids = bids.filter(b => b.status === 'won').length;
+        const lostBids = bids.filter(b => b.status === 'lost').length;
+        const allBids = bids.length;
+        
+        // Update badge displays
+        const activeBadge = document.getElementById('activeBidsCount');
+        const wonBadge = document.getElementById('wonBidsCount');
+        const lostBadge = document.getElementById('lostBidsCount');
+        const allBadge = document.getElementById('allBidsCount');
+        
+        if (activeBadge) activeBadge.textContent = activeBids;
+        if (wonBadge) wonBadge.textContent = wonBids;
+        if (lostBadge) lostBadge.textContent = lostBids;
+        if (allBadge) allBadge.textContent = allBids;
+        
+        // Hide badges with 0 count for cleaner look
+        if (activeBadge && activeBids === 0) activeBadge.style.display = 'none';
+        else if (activeBadge) activeBadge.style.display = 'inline-block';
+        
+        if (wonBadge && wonBids === 0) wonBadge.style.display = 'none';
+        else if (wonBadge) wonBadge.style.display = 'inline-block';
+        
+        if (lostBadge && lostBids === 0) lostBadge.style.display = 'none';
+        else if (lostBadge) lostBadge.style.display = 'inline-block';
+        
+        if (allBadge && allBids === 0) allBadge.style.display = 'none';
+        else if (allBadge) allBadge.style.display = 'inline-block';
     },
     
     // View bid details (from bids page)

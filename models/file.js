@@ -6,8 +6,8 @@ class FileModel {
         const sql = `
             INSERT INTO files (
                 original_name, file_name, file_path, file_size, mime_type,
-                uploaded_by, project_id, bid_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                uploaded_by, project_id, bid_id, user_id, file_type, description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
@@ -18,7 +18,10 @@ class FileModel {
             fileData.mime_type,
             fileData.uploaded_by,
             fileData.project_id || null,
-            fileData.bid_id || null
+            fileData.bid_id || null,
+            fileData.user_id || null,
+            fileData.file_type || null,
+            fileData.description || null
         ];
         
         try {

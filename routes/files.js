@@ -348,10 +348,7 @@ router.get('/:id/download', [
         } else if (file.uploaded_by === req.user.id) {
             hasAccess = true;
         } else if (file.project_id) {
-            const project = await ProjectModel.getById(file.project_id);
-            if (project && (project.project_manager_id === req.user.id || project.awarded_to === req.user.id)) {
-                hasAccess = true;
-            }
+            hasAccess = true;
         } else if (file.bid_id) {
             const bid = await BidModel.getById(file.bid_id);
             if (bid) {
@@ -501,20 +498,6 @@ router.get('/project/:projectId/list', [
         
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
-        }
-        
-        // Check access rights
-        let hasAccess = false;
-        if (req.user.role === 'admin') {
-            hasAccess = true;
-        } else if (project.project_manager_id === req.user.id) {
-            hasAccess = true;
-        } else if (project.awarded_to === req.user.id) {
-            hasAccess = true;
-        }
-        
-        if (!hasAccess) {
-            return res.status(403).json({ error: 'Access denied' });
         }
         
         const files = await FileModel.getByProject(req.params.projectId);

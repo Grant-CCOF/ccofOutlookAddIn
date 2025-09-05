@@ -4,6 +4,7 @@ const { body, param } = require('express-validator');
 const UserModel = require('../models/user');
 const ProjectModel = require('../models/project');
 const BidModel = require('../models/bid');
+const RatingModel = require('../models/rating');
 const AuthService = require('../services/authService');
 const emailService = require('../services/emailService');
 const { authenticateToken, requireRole } = require('../middleware/auth');

@@ -5,6 +5,7 @@ const ProjectModel = require('../models/project');
 const BidModel = require('../models/bid');
 const FileModel = require('../models/file');
 const UserModel = require('../models/user');
+const fileService = require('../services/fileService');
 const NotificationService = require('../services/notificationService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');

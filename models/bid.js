@@ -45,6 +45,43 @@ class BidModel {
         }
     }
 
+    static async update(id, data) {
+        const fields = [];
+        const values = [];
+        
+        // Build dynamic UPDATE query based on provided data
+        if (data.amount !== undefined) {
+            fields.push('amount = ?');
+            values.push(data.amount);
+        }
+        
+        if (data.comments !== undefined) {
+            fields.push('comments = ?');
+            values.push(data.comments);
+        }
+        
+        if (data.alternate_delivery_date !== undefined) {
+            fields.push('alternate_delivery_date = ?');
+            values.push(data.alternate_delivery_date);
+        }
+        
+        // Always update the updated_at timestamp
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        
+        // Add the ID at the end for the WHERE clause
+        values.push(id);
+        
+        const sql = `UPDATE bids SET ${fields.join(', ')} WHERE id = ?`;
+        
+        try {
+            const result = await db.run(sql, values);
+            return result;
+        } catch (error) {
+            logger.error('Error updating bid:', error);
+            throw error;
+        }
+    }
+
     // Get a specific user's bid for a project
     static async getUserBidForProject(userId, projectId, includeTestBids = false) {
         let sql = `

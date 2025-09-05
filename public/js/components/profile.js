@@ -15,7 +15,8 @@ const ProfileComponent = {
             App.showLoading(true);
             
             // Get user (current user or specified user)
-            const targetUserId = userId || Auth.getUserId();
+            const currentUser = Auth.getUser();
+            const targetUserId = userId || (currentUser ? currentUser.id : null);
             const user = userId ? await API.users.getById(userId) : await API.auth.me();
             this.state.user = user;
             
@@ -43,7 +44,7 @@ const ProfileComponent = {
     },
     
     // Render profile content
-    renderProfile() {
+    renderProfile(isViewingOther = false) {
         const { user, stats, certifications } = this.state;
         const roleConfig = Config.USER_ROLES[user.role] || {};
         const isOwnProfile = !isViewingOther;

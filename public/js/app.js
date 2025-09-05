@@ -394,6 +394,11 @@ const App = {
             const isContractor = ['installation_company', 'operations'].includes(role);
             el.style.display = isContractor ? '' : 'none';
         });
+        
+        // Hide elements from project managers only
+        document.querySelectorAll('.hide-from-pm').forEach(el => {
+            el.style.display = role === 'project_manager' ? 'none' : '';
+        });
     },
     
     // Handle window resize

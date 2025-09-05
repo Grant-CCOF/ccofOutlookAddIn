@@ -409,10 +409,21 @@ const BidModals = {
             
             // Process form data
             const data = {
-                amount: parseFloat(formData.get('amount')),
-                alternate_delivery_date: formData.get('alternate_delivery_date') || null,
-                comments: formData.get('comments')
+                amount: parseFloat(formData.get('amount'))
             };
+            
+            // Only include comments if it has a value (not null or empty string)
+            const comments = formData.get('comments');
+            if (comments && comments.trim() !== '') {
+                data.comments = comments.trim();
+            }
+            
+            // Only include alternate_delivery_date if it has a value
+            const alternateDate = formData.get('alternate_delivery_date');
+            if (alternateDate && alternateDate.trim() !== '') {
+                // Ensure it's in ISO8601 format
+                data.alternate_delivery_date = new Date(alternateDate).toISOString();
+            }
             
             // Validate
             const validation = this.validateBidData(data);
@@ -467,7 +478,13 @@ const BidModals = {
             
         } catch (error) {
             console.error('Error updating bid:', error);
-            App.showError(error.message || 'Failed to update bid');
+            
+            // Check for validation errors from the backend
+            if (error.message && error.message.includes('400')) {
+                App.showError('Invalid bid data. Please check your inputs.');
+            } else {
+                App.showError(error.message || 'Failed to update bid');
+            }
         } finally {
             App.showLoading(false);
         }

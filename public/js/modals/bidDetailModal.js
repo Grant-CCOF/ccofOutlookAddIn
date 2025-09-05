@@ -339,11 +339,10 @@
                         ${fileSize > 0 ? `<small class="file-size text-muted">${this.formatFileSize(fileSize)}</small>` : ''}
                     </div>
                     <div class="file-actions">
-                        <a href="${API.files.download(file.id)}" 
-                           class="btn btn-sm btn-outline-primary" 
-                           target="_blank">
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="API.files.download(${file.id}, '${fileName.replace(/'/g, "\\'")}').catch(err => App.showError('Failed to download file'))">
                             <i class="fas fa-download"></i> Download
-                        </a>
+                        </button>
                     </div>
                 </div>
             `;
