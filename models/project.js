@@ -248,7 +248,14 @@ class ProjectModel {
     
     static async delete(id) {
         const sql = `DELETE FROM projects WHERE id = ?`;
-        return db.run(sql, [id]);
+        
+        try {
+            const result = await db.run(sql, [id]);
+            return result.changes > 0;
+        } catch (error) {
+            logger.error('Error deleting project:', error);
+            throw error;
+        }
     }
     
     static async getCount() {

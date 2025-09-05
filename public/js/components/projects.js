@@ -570,6 +570,14 @@ const ProjectsComponent = {
                 </button>
             `);
         }
+
+        if (isAdmin || (isManager && ['draft', 'bidding', 'reviewing'].includes(project.status))) {
+            actions.push(`
+                <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            `);
+        }
         
         // Admin-only test actions
         if (isAdmin) {
@@ -887,6 +895,77 @@ const ProjectsComponent = {
                 </div>
             </div>
         `;
+    },
+
+    showDeleteConfirmation(projectId) {
+        const project = this.state.projects.find(p => p.id === projectId);
+        if (!project) return;
+        
+        const modalContent = `
+            <div class="delete-confirmation-modal">
+                <div class="modal-icon text-danger">
+                    <i class="fas fa-exclamation-triangle fa-3x"></i>
+                </div>
+                <h4 class="text-center mt-3">Delete Project?</h4>
+                <p class="text-center text-muted">
+                    Are you sure you want to delete "<strong>${project.title}</strong>"?
+                </p>
+                <div class="alert alert-danger">
+                    <i class="fas fa-info-circle"></i> <strong>Warning:</strong> This action cannot be undone!
+                    <ul class="mt-2 mb-0">
+                        <li>All project files will be permanently deleted</li>
+                        <li>All bids and bid files will be removed</li>
+                        <li>All project history will be lost</li>
+                    </ul>
+                </div>
+                ${project.bid_count > 0 ? `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-gavel"></i> This project has <strong>${project.bid_count} bid(s)</strong> that will also be deleted.
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+        Modal.show({
+            title: 'Confirm Deletion',
+            body: modalContent,
+            size: 'medium',
+            buttons: [
+                {
+                    text: 'Cancel',
+                    class: 'btn-outline',
+                    handler: () => Modal.hide()
+                },
+                {
+                    text: 'Delete Project',
+                    class: 'btn-danger',
+                    handler: () => this.deleteProject(projectId)
+                }
+            ]
+        });
+    },
+
+    // Delete project
+    async deleteProject(projectId) {
+        try {
+            App.showLoading(true, 'Deleting project and all associated data...');
+            
+            const response = await API.projects.delete(projectId);
+            
+            Modal.hide();
+            
+            App.showSuccess(`Project "${response.deletedProject.title}" has been deleted successfully`);
+            
+            // Remove from state and re-render
+            this.state.projects = this.state.projects.filter(p => p.id !== projectId);
+            await this.loadProjects();
+            
+        } catch (error) {
+            Config.error('Failed to delete project:', error);
+            App.showError(error.message || 'Failed to delete project');
+        } finally {
+            App.showLoading(false);
+        }
     },
 
     async downloadFile(fileId, filename) {

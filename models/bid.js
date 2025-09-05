@@ -302,6 +302,37 @@ class BidModel {
         const sql = `DELETE FROM bids WHERE id = ?`;
         return db.run(sql, [id]);
     }
+
+    static async deleteByProject(projectId) {
+        const sql = `DELETE FROM bids WHERE project_id = ?`;
+        
+        try {
+            const result = await db.run(sql, [projectId]);
+            return result.changes;
+        } catch (error) {
+            logger.error('Error deleting bids by project:', error);
+            throw error;
+        }
+    }
+
+    static async getByProject(projectId) {
+        const sql = `
+            SELECT b.*, 
+                u.name as user_name, 
+                u.company as user_company
+            FROM bids b
+            LEFT JOIN users u ON b.user_id = u.id
+            WHERE b.project_id = ?
+            ORDER BY b.created_at DESC
+        `;
+        
+        try {
+            return await db.all(sql, [projectId]);
+        } catch (error) {
+            logger.error('Error getting bids by project:', error);
+            throw error;
+        }
+    }
     
     static async getCount() {
         const sql = `SELECT COUNT(*) as count FROM bids`;

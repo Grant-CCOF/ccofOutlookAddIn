@@ -254,6 +254,7 @@ const ProjectTemplates = {
         const user = State.getUser();
         const isManager = user.id === project.project_manager_id;
         const isContractor = ['installation_company', 'operations'].includes(user.role);
+        const isAdmin = user.role === 'admin';
         const actions = [];
         
         if (isManager) {
@@ -285,6 +286,14 @@ const ProjectTemplates = {
                 actions.push(`
                     <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
                         <i class="fas fa-edit"></i> Edit
+                    </button>
+                `);
+            }
+
+            if ((isAdmin || isManager) && !['awarded', 'completed'].includes(project.status)) {
+                actions.push(`
+                    <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
+                        <i class="fas fa-trash"></i> Delete
                     </button>
                 `);
             }

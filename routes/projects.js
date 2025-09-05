@@ -168,7 +168,7 @@ router.put('/:id', [
     }
 });
 
-// Delete project
+// Delete project with all associated data
 router.delete('/:id', [
     authenticateToken,
     requireRole(['admin', 'project_manager']),
@@ -182,21 +182,71 @@ router.delete('/:id', [
             return res.status(404).json({ error: 'Project not found' });
         }
         
-        // Check ownership
+        // Check ownership - only project owner or admin can delete
         if (req.user.role === 'project_manager' && project.project_manager_id !== req.user.id) {
-            return res.status(403).json({ error: 'Access denied' });
+            return res.status(403).json({ error: 'Access denied - you can only delete your own projects' });
         }
         
-        // Don't allow deletion if project is awarded or completed
+        // Don't allow deletion of awarded or completed projects
         if (['awarded', 'completed'].includes(project.status)) {
             return res.status(400).json({ error: 'Cannot delete awarded or completed projects' });
         }
         
+        // Start transaction-like deletion process
+        logger.info(`Starting deletion of project ${req.params.id} by user ${req.user.id}`);
+        
+        // 1. Delete all files associated with the project
+        try {
+            const projectFiles = await FileModel.getByProject(req.params.id);
+            for (const file of projectFiles) {
+                await fileService.deleteFile(file.file_path);
+                logger.info(`Deleted file: ${file.file_name}`);
+            }
+            await FileModel.deleteByProject(req.params.id);
+            logger.info(`Deleted ${projectFiles.length} project files from database`);
+        } catch (fileError) {
+            logger.error(`Error deleting project files: ${fileError.message}`);
+            // Continue with deletion even if file cleanup fails
+        }
+        
+        // 2. Delete all files associated with bids for this project
+        try {
+            const projectBids = await BidModel.getByProject(req.params.id);
+            for (const bid of projectBids) {
+                const bidFiles = await FileModel.getByBid(bid.id);
+                for (const file of bidFiles) {
+                    await fileService.deleteFile(file.file_path);
+                    logger.info(`Deleted bid file: ${file.file_name}`);
+                }
+                await FileModel.deleteByBid(bid.id);
+            }
+            logger.info(`Deleted files for ${projectBids.length} bids`);
+        } catch (bidFileError) {
+            logger.error(`Error deleting bid files: ${bidFileError.message}`);
+            // Continue with deletion
+        }
+        
+        // 3. Delete all bids for this project
+        try {
+            const deleteCount = await BidModel.deleteByProject(req.params.id);
+            logger.info(`Deleted ${deleteCount} bids for project ${req.params.id}`);
+        } catch (bidError) {
+            logger.error(`Error deleting bids: ${bidError.message}`);
+            return res.status(500).json({ error: 'Failed to delete project bids' });
+        }
+        
+        // 4. Delete the project itself
         await ProjectModel.delete(req.params.id);
         
-        logger.info(`Project deleted: ${project.id} by ${req.user.username}`);
+        logger.info(`Successfully deleted project ${req.params.id} with all associated data`);
         
-        res.json({ message: 'Project deleted successfully' });
+        res.json({ 
+            message: 'Project and all associated data deleted successfully',
+            deletedProject: {
+                id: project.id,
+                title: project.title
+            }
+        });
     } catch (error) {
         logger.error('Error deleting project:', error);
         res.status(500).json({ error: 'Failed to delete project' });
