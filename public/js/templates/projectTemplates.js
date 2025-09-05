@@ -296,6 +296,16 @@ const ProjectTemplates = {
                         <i class="fas fa-trash"></i> Delete
                     </button>
                 `);
+            } else if ((isAdmin || isManager) && ['awarded', 'completed'].includes(project.status)) {
+                // Show disabled delete button with tooltip
+                actions.push(`
+                    <button class="btn btn-danger" disabled 
+                            data-bs-toggle="tooltip" 
+                            data-bs-placement="top" 
+                            title="Cannot delete ${project.status} projects">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                `);
             }
         }
         
@@ -303,15 +313,6 @@ const ProjectTemplates = {
             actions.push(`
                 <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
                     <i class="fas fa-gavel"></i> Place Bid
-                </button>
-            `);
-        }
-        
-        // Common actions
-        if (isManager) {
-            actions.push(`
-                <button class="btn btn-danger" onclick="ProjectsComponent.deleteProject(${project.id})">
-                    <i class="fas fa-trash"></i> Delete
                 </button>
             `);
         }

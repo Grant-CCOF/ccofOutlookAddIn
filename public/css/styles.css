@@ -2565,3 +2565,21 @@ input[type="password"]:valid {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
 }
+
+/* Disabled delete button with tooltip */
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #dc3545;
+}
+
+.btn-danger:disabled:hover {
+    background: #dc3545;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Tooltip styling for disabled buttons */
+[data-bs-toggle="tooltip"] {
+    position: relative;
+}

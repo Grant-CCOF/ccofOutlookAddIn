@@ -267,6 +267,15 @@ install_app_files() {
                 cp -r $dir/* $APP_DIR/$dir/ 2>/dev/null && print_status "Copied $dir files"
             fi
         done
+
+        # IMPORTANT: Copy nginx configuration
+        if [[ -f "nginx-config.conf" ]]; then
+            cp nginx-config.conf $APP_DIR/
+            print_status "Copied nginx-config.conf"
+        elif [[ -f "../nginx-config.conf" ]]; then
+            cp ../nginx-config.conf $APP_DIR/
+            print_status "Copied nginx-config.conf from parent directory"
+        fi
         
         # Frontend files - Check both possible locations
         # Priority 1: public/index.html (new structure)
@@ -447,11 +456,15 @@ install_dependencies() {
     
     cd $APP_DIR
     
-    # Clean install for production
-    sudo -u $APP_USER npm ci --production 2>/dev/null || sudo -u $APP_USER npm install --production
+    # Clean install for production (using new syntax)
+    sudo -u $APP_USER npm ci --omit=dev 2>/dev/null || sudo -u $APP_USER npm install --omit=dev
     
     # Ensure Socket.IO is installed
-    sudo -u $APP_USER npm install socket.io@4.6.1 --save
+    sudo -u $APP_USER npm install socket.io@^4.7.4 --save
+    
+    # Run security audit and attempt fixes
+    print_status "Running security audit..."
+    sudo -u $APP_USER npm audit fix --omit=dev || true
     
     print_success "Dependencies installed"
 }
@@ -552,8 +565,40 @@ configure_nginx() {
     mkdir -p /var/cache/nginx
     chown www-data:www-data /var/cache/nginx
     
-    # Create Nginx configuration with fixed Socket.IO handling
-    cat > /etc/nginx/sites-available/$APP_NAME << 'EOF'
+    # Look for nginx-config.conf in multiple possible locations
+    NGINX_CONF=""
+    
+    # Check various possible locations for the config file
+    if [[ -f "$APP_DIR/nginx-config.conf" ]]; then
+        NGINX_CONF="$APP_DIR/nginx-config.conf"
+        print_status "Found nginx config at $APP_DIR/nginx-config.conf"
+    elif [[ -f "../nginx-config.conf" ]]; then
+        NGINX_CONF="../nginx-config.conf"
+        print_status "Found nginx config at ../nginx-config.conf"
+    elif [[ -f "./nginx-config.conf" ]]; then
+        NGINX_CONF="./nginx-config.conf"
+        print_status "Found nginx config at ./nginx-config.conf"
+    elif [[ -f "nginx-config.conf" ]]; then
+        NGINX_CONF="nginx-config.conf"
+        print_status "Found nginx config at nginx-config.conf"
+    fi
+    
+    if [[ -n "$NGINX_CONF" ]]; then
+        # Copy the nginx configuration
+        cp "$NGINX_CONF" /etc/nginx/sites-available/$APP_NAME
+        
+        # Replace placeholders
+        sed -i "s|your-domain.com|${DOMAIN:-'_'}|g" /etc/nginx/sites-available/$APP_NAME
+        sed -i "s|/opt/capital-choice-platform|$APP_DIR|g" /etc/nginx/sites-available/$APP_NAME
+        
+        print_success "Using complete nginx configuration from file"
+    else
+        print_warning "nginx-config.conf not found, creating configuration..."
+        
+        # Fall back to creating the configuration
+        cat > /etc/nginx/sites-available/$APP_NAME << EOF
+# /etc/nginx/sites-available/capital-choice-platform
+
 # Cache configuration
 proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=app_cache:10m max_size=100m inactive=60m use_temp_path=off;
 
@@ -564,9 +609,33 @@ upstream app_backend {
     keepalive 64;
 }
 
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
+limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/m;
+
+# Redirect HTTP to HTTPS (uncomment when SSL is configured)
+# server {
+#     listen 80;
+#     server_name your-domain.com;
+#     return 301 https://$server_name$request_uri;
+# }
+
 server {
     listen 80;
-    server_name ${DOMAIN:-'_'};
+    server_name _;  # Replace with your domain
+    
+    # SSL configuration (uncomment when SSL is configured)
+    # listen 443 ssl http2;
+    # ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    # ssl_protocols TLSv1.2 TLSv1.3;
+    # ssl_ciphers HIGH:!aNULL:!MD5;
+    # ssl_prefer_server_ciphers on;
+    # ssl_session_cache shared:SSL:10m;
+    # ssl_session_timeout 10m;
+    # ssl_stapling on;
+    # ssl_stapling_verify on;
     
     # Security headers
     add_header X-Frame-Options "DENY" always;
@@ -574,20 +643,34 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' ws: wss:;" always;
     
     # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
     gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml application/atom+xml image/svg+xml text/x-js text/x-cross-domain-policy application/x-font-ttf application/x-font-opentype application/vnd.ms-fontobject image/x-icon;
     gzip_disable "msie6";
     
     # Client body size for file uploads
     client_max_body_size 10M;
+    client_body_buffer_size 128k;
+    
+    # Timeouts
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    send_timeout 60s;
     
     # Root directory for static files
     root /opt/capital-choice-platform/public;
     index index.html;
+    
+    # Logging
+    access_log /var/log/nginx/capital-choice-access.log combined;
+    error_log /var/log/nginx/capital-choice-error.log warn;
     
     # IMPORTANT: Socket.IO MUST come FIRST before any regex patterns
     # Socket.IO WebSocket and polling transport
@@ -600,13 +683,37 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $server_name;
         proxy_buffering off;
+        proxy_cache off;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
+        
+        # Socket.IO specific
+        proxy_set_header X-NginX-Proxy true;
+        proxy_redirect off;
+    }
+    
+    # API routes with rate limiting
+    location /api/auth/ {
+        limit_req zone=auth burst=5 nodelay;
+        
+        proxy_pass http://app_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Disable caching for auth
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
     }
     
     # API routes - proxy to Node.js backend
     location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        
         proxy_pass http://app_backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -619,9 +726,20 @@ server {
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
         
-        # Disable caching for API
-        proxy_no_cache 1;
-        proxy_cache_bypass 1;
+        # Cache GET requests (except auth endpoints)
+        proxy_cache app_cache;
+        proxy_cache_valid 200 1m;
+        proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
+        proxy_cache_bypass $http_authorization;
+        add_header X-Cache-Status $upstream_cache_status;
+    }
+    
+    # Health check endpoint (no rate limiting)
+    location = /api/health {
+        proxy_pass http://app_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        access_log off;
     }
     
     # Uploaded files (served directly by Nginx)
@@ -632,31 +750,56 @@ server {
         access_log off;
         
         # Security: Prevent execution of uploaded files
-        location ~* \.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$ {
+        location ~* \.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi|exe|dll)$ {
             deny all;
+            return 403;
+        }
+        
+        # Limit access to specific file types
+        location ~ /uploads/.*\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|txt|csv|zip)$ {
+            # Allow these file types
+        }
+        
+        location ~ /uploads/ {
+            # Deny everything else
+            deny all;
+            return 403;
         }
     }
     
-    # Static assets - NO .js files here to prevent catching socket.io.js
-    location ~* \.(jpg|jpeg|png|gif|ico|css|svg|woff|woff2|ttf|eot)$ {
+    # Static assets - NO .js files in the regex to prevent catching socket.io.js
+    location ~* \.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
         expires 30d;
         add_header Cache-Control "public, immutable";
+        access_log off;
+        
+        # Apply rate limiting to prevent abuse
+        limit_req zone=general burst=30 nodelay;
+    }
+    
+    # CSS files with moderate caching
+    location ~* \.css$ {
+        expires 7d;
+        add_header Cache-Control "public, must-revalidate";
+        access_log off;
+    }
+    
+    # JavaScript files with moderate caching
+    location ~* \.js$ {
+        expires 7d;
+        add_header Cache-Control "public, must-revalidate";
         access_log off;
     }
     
     # Main application - serve static files and fall back to index.html
     location / {
+        limit_req zone=general burst=10 nodelay;
+        
         try_files $uri $uri/ /index.html;
         
         # HTML files should not be cached aggressively
         location ~* \.html$ {
             expires 1h;
-            add_header Cache-Control "public, must-revalidate";
-        }
-        
-        # JavaScript and CSS files served from public directory
-        location ~* \.(js|css)$ {
-            expires 7d;
             add_header Cache-Control "public, must-revalidate";
         }
     }
@@ -665,6 +808,7 @@ server {
     location = /favicon.ico {
         log_not_found off;
         access_log off;
+        expires 30d;
     }
     
     location = /robots.txt {
@@ -672,31 +816,55 @@ server {
         access_log off;
     }
     
-    # Deny access to hidden files (except .well-known for Let's Encrypt)
+    # Security: Deny access to hidden files (except .well-known for Let's Encrypt)
     location ~ /\.(?!well-known) {
         deny all;
         access_log off;
         log_not_found off;
+        return 404;
+    }
+    
+    # Security: Deny access to sensitive files
+    location ~* \.(log|conf|sql|bak|backup|swp|save|old)$ {
+        deny all;
+        return 404;
+    }
+    
+    # Block common attack patterns
+    location ~* (eval\(|base64_|shell_|exec\(|php_|\.\.\/|\.\.\\|index\.php) {
+        deny all;
+        return 403;
+    }
+    
+    # Custom error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    
+    location = /404.html {
+        root /opt/capital-choice-platform/public;
+        internal;
+    }
+    
+    location = /50x.html {
+        root /opt/capital-choice-platform/public;
+        internal;
     }
 }
 EOF
-    
-    # Replace domain placeholder
-    sed -i "s/\${DOMAIN:-'_'}/${DOMAIN:-'_'}/g" /etc/nginx/sites-available/$APP_NAME
-    
-    # Enable site
-    if [[ -d /etc/nginx/sites-enabled ]]; then
-        ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
-        rm -f /etc/nginx/sites-enabled/default
-    else
-        # CentOS/RHEL style
-        ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/conf.d/$APP_NAME.conf
     fi
     
-    # Test configuration
-    nginx -t
+    # Enable site
+    ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
+    rm -f /etc/nginx/sites-enabled/default
     
-    print_success "Nginx configured with proper Socket.IO handling"
+    # Test configuration
+    if nginx -t; then
+        systemctl reload nginx
+        print_success "Nginx configured with security rules"
+    else
+        print_error "Nginx configuration test failed"
+        exit 1
+    fi
 }
 
 # Function to setup SSL with Let's Encrypt
