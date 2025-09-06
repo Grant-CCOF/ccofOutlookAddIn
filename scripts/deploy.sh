@@ -597,9 +597,6 @@ configure_nginx() {
         
         # Fall back to creating the configuration
         cat > /etc/nginx/sites-available/$APP_NAME << EOF
-# /etc/nginx/sites-available/capital-choice-platform
-# Improved and hardened nginx configuration
-
 # Cache configuration
 proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=app_cache:10m max_size=100m inactive=60m use_temp_path=off;
 
@@ -631,22 +628,9 @@ log_format detailed '$remote_addr - $remote_user [$time_local] '
 
 server {
     listen 80;
-    server_name _;  # Replace with your domain
+    server_name ${DOMAIN:-'_'};
     
-    # SSL configuration (uncomment when SSL is configured)
-    # listen 443 ssl http2;
-    # ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    # ssl_protocols TLSv1.2 TLSv1.3;
-    # ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    # ssl_prefer_server_ciphers on;
-    # ssl_session_cache shared:SSL:10m;
-    # ssl_session_timeout 10m;
-    # ssl_stapling on;
-    # ssl_stapling_verify on;
-    # ssl_dhparam /etc/nginx/dhparam.pem;
-    
-    # Enhanced Security headers
+    # Security headers
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
@@ -658,20 +642,20 @@ server {
     
     # Improved Content Security Policy
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.socket.io https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';" always;
-    
+
     # Gzip compression
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
-    gzip_proxied any;
-    gzip_comp_level 6;
     gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml application/atom+xml image/svg+xml text/x-js text/x-cross-domain-policy application/x-font-ttf application/x-font-opentype application/vnd.ms-fontobject image/x-icon;
     gzip_disable "msie6";
+    gzip_proxied any;
+    gzip_comp_level 6;
     
     # Client body size for file uploads
     client_max_body_size 10M;
     client_body_buffer_size 128k;
-    
+
     # Timeouts
     proxy_connect_timeout 60s;
     proxy_send_timeout 60s;
@@ -681,7 +665,7 @@ server {
     # Root directory for static files
     root /opt/capital-choice-platform/public;
     index index.html;
-    
+
     # Enhanced logging
     access_log /var/log/nginx/capital-choice-access.log detailed;
     error_log /var/log/nginx/capital-choice-error.log warn;
@@ -697,24 +681,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $server_name;
-        proxy_set_header X-Forwarded-Port $server_port;
         proxy_buffering off;
-        proxy_cache off;
-        proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 300s;
         proxy_connect_timeout 75s;
-        
-        # Socket.IO specific
-        proxy_set_header X-NginX-Proxy true;
-        proxy_redirect off;
     }
     
-    # API routes with rate limiting
+    # API routes - proxy to Node.js backend
     location /api/auth/ {
         limit_req zone=auth burst=3 nodelay;
         limit_req_status 429;
-        
         proxy_pass http://app_backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -723,26 +698,28 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $server_name;
         proxy_cache_bypass $http_upgrade;
-        
+
         # No caching for auth endpoints
         proxy_cache off;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Pragma "no-cache" always;
         add_header Expires "0" always;
     }
-    
+
     location /api/ {
         limit_req zone=api burst=20 nodelay;
         limit_req_status 429;
-        
         proxy_pass http://app_backend;
         proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $server_name;
         proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
         
         # Cache GET requests for a short time
         proxy_cache app_cache;
@@ -753,7 +730,7 @@ server {
         add_header X-Cache-Status $upstream_cache_status;
     }
     
-    # Enhanced file upload security
+    # Uploaded files (served directly by Nginx)
     location /uploads/ {
         # First, handle allowed file types with strict validation
         location ~ /uploads/[^/]+\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|txt|csv|zip)$ {
@@ -769,12 +746,12 @@ server {
                 return 403;
             }
         }
-        
+
         # Deny everything else in uploads
         deny all;
         return 403;
     }
-    
+
     # Static assets with enhanced caching and rate limiting
     location ~* \.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
         expires 30d;
@@ -783,40 +760,33 @@ server {
         limit_req zone=static burst=50 nodelay;
         access_log off;
         
-        # Security headers for static assets
-        add_header X-Content-Type-Options "nosniff" always;
+        # Security: Prevent execution of uploaded files
+        location ~* \.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$ {
+            deny all;
+        }
     }
     
-    # CSS files with moderate caching
-    location ~* \.css$ {
-        expires 7d;
-        add_header Cache-Control "public, must-revalidate";
-        add_header Vary "Accept-Encoding";
-        limit_req zone=static burst=30 nodelay;
-        access_log off;
-    }
-    
-    # JavaScript files with moderate caching
-    location ~* \.js$ {
-        expires 7d;
-        add_header Cache-Control "public, must-revalidate";
-        add_header Vary "Accept-Encoding";
-        limit_req zone=static burst=30 nodelay;
+    # Static assets - NO .js files here to prevent catching socket.io.js
+    location ~* \.(jpg|jpeg|png|gif|ico|css|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
         access_log off;
     }
     
     # Main application - serve static files and fall back to index.html
     location / {
-        limit_req zone=general burst=10 nodelay;
-        limit_req_status 429;
-        
         try_files $uri $uri/ /index.html;
         
         # HTML files should not be cached aggressively
         location ~* \.html$ {
             expires 1h;
             add_header Cache-Control "public, must-revalidate";
-            add_header Vary "Accept-Encoding";
+        }
+        
+        # JavaScript and CSS files served from public directory
+        location ~* \.(js|css)$ {
+            expires 7d;
+            add_header Cache-Control "public, must-revalidate";
         }
     }
     
@@ -835,36 +805,37 @@ server {
         add_header Cache-Control "public, must-revalidate";
     }
     
-    # Security: Deny access to hidden files (except .well-known for Let's Encrypt)
+    # Deny access to hidden files (except .well-known for Let's Encrypt)
     location ~ /\.(?!well-known) {
         deny all;
         access_log off;
         log_not_found off;
         return 404;
+        
     }
-    
+
     # Security: Deny access to sensitive files
     location ~* \.(log|conf|sql|bak|backup|swp|save|old|tmp|temp)$ {
         deny all;
         return 404;
     }
-    
+
     # Block common attack patterns and malicious requests
     location ~* (eval\(|base64_|shell_|exec\(|php_|\.\.\/|\.\.\\|index\.php|union.*select|insert.*into|drop.*table) {
         deny all;
         return 403;
     }
-    
+
     # Block requests with suspicious user agents
     if ($http_user_agent ~* (bot|spider|crawler|scanner|grabber|scraper)) {
         return 403;
     }
-    
+
     # Block requests with no user agent
     if ($http_user_agent = "") {
         return 403;
     }
-    
+
     # Enhanced error pages
     error_page 404 /404.html;
     error_page 429 /429.html;
@@ -875,14 +846,14 @@ server {
         internal;
         add_header Cache-Control "no-cache" always;
     }
-    
+
     location = /429.html {
         root /opt/capital-choice-platform/public;
         internal;
         add_header Cache-Control "no-cache" always;
         add_header Retry-After "60" always;
     }
-    
+
     location = /50x.html {
         root /opt/capital-choice-platform/public;
         internal;
