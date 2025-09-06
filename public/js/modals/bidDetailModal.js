@@ -487,7 +487,7 @@
             }
         },
         
-        // Withdraw bid
+        // Withdraw bid - Updated to refresh all views
         async withdrawBid(bidId) {
             if (!confirm('Are you sure you want to withdraw this bid?')) {
                 return;
@@ -498,12 +498,51 @@
                 App.showSuccess('Bid withdrawn successfully');
                 this.closeModal();
                 
-                // Refresh the page
-                if (window.BidsComponent) {
-                    BidsComponent.loadBids();
+                // Refresh based on current page/view
+                const currentHash = window.location.hash;
+                
+                // Check if we're in project detail view
+                if (currentHash.includes('/projects/') && window.ProjectsComponent) {
+                    // Extract project ID from URL hash
+                    const projectId = currentHash.split('/projects/')[1];
+                    if (projectId) {
+                        // Refresh project detail view
+                        await ProjectsComponent.renderDetail(projectId);
+                    }
+                } 
+                // Check if we're in projects list view
+                else if (currentHash.includes('#/projects') && window.ProjectsComponent) {
+                    // Refresh projects list
+                    await ProjectsComponent.loadProjects();
+                    // Re-render the current tab/filter if applicable
+                    if (ProjectsComponent.render) {
+                        await ProjectsComponent.render();
+                    }
                 }
+                // Default to refreshing bids view
+                else if (window.BidsComponent) {
+                    await BidsComponent.loadBids();
+                }
+                
             } catch (error) {
                 App.showError('Failed to withdraw bid');
+                
+                // Still refresh the appropriate view on error to ensure UI consistency
+                const currentHash = window.location.hash;
+                
+                if (currentHash.includes('/projects/') && window.ProjectsComponent) {
+                    const projectId = currentHash.split('/projects/')[1];
+                    if (projectId) {
+                        await ProjectsComponent.renderDetail(projectId);
+                    }
+                } else if (currentHash.includes('#projects') && window.ProjectsComponent) {
+                    await ProjectsComponent.loadProjects();
+                    if (ProjectsComponent.render) {
+                        await ProjectsComponent.render();
+                    }
+                } else if (window.BidsComponent) {
+                    await BidsComponent.loadBids();
+                }
             }
         },
         

@@ -178,26 +178,37 @@ const ProjectsComponent = {
     // Load projects
     async loadProjects() {
         try {
-            const params = {
-                page: this.state.currentPage,
-                limit: Config.DEFAULT_PAGE_SIZE,
-                ...this.state.filters
-            };
+            App.showLoading(true);
             
-            const response = await API.projects.getAll(params);
+            // Clear any cached project data to ensure fresh load
+            this.state.projects = [];
             
-            this.state.projects = response.data || response;
-            this.state.totalPages = response.totalPages || 1;
+            // Build query params
+            const params = {};
             
+            if (this.state.filters.status) {
+                params.status = this.state.filters.status;
+            }
+            
+            // Fetch fresh projects from server - NO CACHING
+            const projects = await API.projects.getAll(params);
+            
+            // Store projects in state
+            this.state.projects = projects;
+            
+            // Render projects
             this.renderProjects();
-            this.renderPagination();
+            
+            return projects;
             
         } catch (error) {
             Config.error('Failed to load projects:', error);
-            this.renderEmptyState();
+            this.renderError('Failed to load projects');
+        } finally {
+            App.showLoading(false);
         }
     },
-    
+        
     // Render projects
     renderProjects() {
         const container = DOM.get('projectsList');
@@ -231,7 +242,9 @@ const ProjectsComponent = {
         const isManager = user.id === project.project_manager_id;
         const canBid = ['installation_company', 'operations'].includes(user.role) && 
                       project.status === 'bidding';
-        
+        const showPlaceBid = ['installation_company'].includes(user.role) && project.status === 'bidding' && !project.has_bid;
+        const showViewBid = ['installation_company'].includes(user.role) && project.has_bid;
+
         return `
             <div class="project-card" data-project-id="${project.id}">
                 <div class="project-card-header">
@@ -285,10 +298,17 @@ const ProjectsComponent = {
                             </button>
                         ` : ''}
                         
-                        ${canBid ? `
+                        ${showPlaceBid ? `
                             <button class="btn btn-sm btn-primary" 
                                     onclick="ProjectsComponent.showBidModal(${project.id})">
                                 <i class="fas fa-gavel"></i> Place Bid
+                            </button>
+                        ` : ''}
+                    
+                        ${showViewBid ? `
+                            <button class="btn btn-sm btn-info" 
+                                    onclick="ProjectsComponent.viewUserBid(${project.id})">
+                                <i class="fas fa-eye"></i> View ${project.user_bid_status === 'won' ? 'Winning' : 'Your'} Bid
                             </button>
                         ` : ''}
                         
@@ -442,6 +462,8 @@ const ProjectsComponent = {
         const isAdmin = user.role === 'admin';
         const canBid = ['installation_company', 'operations'].includes(user.role) && 
                     project.status === 'bidding';
+        const canPlaceBid = ['installation_company'].includes(user.role) && project.status === 'bidding' && !project.has_bid;
+        const canViewBid = ['installation_company'].includes(user.role) && project.has_bid;
         
         return `
             <div class="project-detail">
@@ -466,9 +488,22 @@ const ProjectsComponent = {
                             
                             <div class="project-actions">
                                 ${(isManager || isAdmin) ? this.renderManagerActions(project, isAdmin) : ''}
-                                ${canBid || (isAdmin && !canBid) ? `
+                                ${canPlaceBid ? `
                                     <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
-                                        <i class="fas fa-gavel"></i> Place Bid${isAdmin && !canBid ? ' (Admin)' : ''}
+                                        <i class="fas fa-gavel"></i> Place Bid
+                                    </button>
+                                ` : ''}
+                                
+                                ${canViewBid ? `
+                                    <button class="btn btn-info" onclick="ProjectsComponent.viewUserBid(${project.id})">
+                                        <i class="fas fa-eye"></i> View ${project.user_bid_status === 'won' ? 'Winning' : 'Your'} Bid
+                                    </button>
+                                ` : ''}
+                                
+                                <!-- Admin test bid button -->
+                                ${isAdmin && project.status === 'bidding' ? `
+                                    <button class="btn btn-warning" onclick="ProjectsComponent.showBidModal(${project.id})">
+                                        <i class="fas fa-gavel"></i> Place Test Bid
                                     </button>
                                 ` : ''}
                             </div>
@@ -1069,7 +1104,36 @@ const ProjectsComponent = {
     },
     
     async showBidModal(projectId) {
-        BidModals.showCreateModal(projectId);
+        try {
+            // IMPORTANT: Always fetch fresh project data to check has_bid status
+            const project = await API.projects.getById(projectId);
+            
+            // Double-check if user has already bid (in case of stale UI)
+            if (project.has_bid) {
+                App.showWarning('You have already submitted a bid for this project');
+                // Refresh the current view to update the UI
+                const currentHash = window.location.hash;
+                if (currentHash.includes(`/projects/${projectId}`)) {
+                    await this.renderDetail(projectId);
+                } else {
+                    await this.loadProjects();
+                }
+                return;
+            }
+            
+            // Check if project is open for bidding
+            if (project.status !== 'bidding') {
+                App.showError('This project is not open for bidding');
+                return;
+            }
+            
+            // Show the bid modal
+            await BidModals.showCreateModal(projectId);
+            
+        } catch (error) {
+            App.showError('Failed to load project details');
+            console.error('Error in showBidModal:', error);
+        }
     },
     
     async startBidding(projectId) {
@@ -1172,6 +1236,8 @@ const ProjectsComponent = {
     
     // Refresh projects
     async refreshProjects() {
+        // Clear the projects array to force a fresh load
+        this.state.projects = [];
         await this.loadProjects();
     },
 
@@ -1420,6 +1486,44 @@ const ProjectsComponent = {
                 filesList.innerHTML = '';
             }
         });
+    },
+
+    // View the current user's bid for a project
+    async viewUserBid(projectId) {
+        try {
+            App.showLoading(true);
+            
+            // Get the user's bid for this project
+            const response = await API.get(`/bids/project/${projectId}`);
+            
+            if (response && response.length > 0) {
+                // The API returns an array with just the user's bid for installers
+                const userBid = response[0];
+                
+                // Use the existing viewBidDetails function from BidsComponent
+                if (window.BidsComponent && window.BidsComponent.viewBidDetails) {
+                    await BidsComponent.viewBidDetails(userBid.id);
+                } else {
+                    // Fallback: navigate to the bids page
+                    Router.navigate(`/bids`);
+                    
+                    // If BidDetailModal is available, show the bid details
+                    if (window.BidDetailModal) {
+                        setTimeout(() => {
+                            BidDetailModal.show(userBid.id);
+                        }, 500);
+                    }
+                }
+            } else {
+                App.showError('Your bid could not be found');
+            }
+            
+        } catch (error) {
+            Config.error('Failed to load bid:', error);
+            App.showError('Failed to load your bid details');
+        } finally {
+            App.showLoading(false);
+        }
     },
 
     async adminResetProject(projectId) {

@@ -315,20 +315,14 @@ const BidModals = {
             const form = DOM.get('createBidForm');
             const formData = new FormData(form);
             
-            // Process form data - ENSURE project_id is an integer
             const data = {
-                project_id: parseInt(projectId, 10),  // Convert to integer
+                project_id: projectId,
                 amount: parseFloat(formData.get('amount')),
-                alternate_delivery_date: formData.get('alternate_delivery_date') || null,
-                comments: formData.get('comments') || ''  // Ensure it's a string, not null
+                comments: formData.get('comments'),
+                alternate_delivery_date: formData.get('alternate_delivery_date')
             };
             
-            // Additional validation to catch issues early
-            if (isNaN(data.project_id)) {
-                App.showError('Invalid project ID');
-                return;
-            }
-            
+            // Check if amount is valid
             if (isNaN(data.amount)) {
                 App.showError('Invalid bid amount');
                 return;
@@ -371,31 +365,37 @@ const BidModals = {
             App.showSuccess('Bid submitted successfully');
             this.closeModal();
             
-            // Refresh bids or projects
+            // IMPORTANT FIX: Refresh the appropriate component based on current page
+            const currentHash = window.location.hash;
+            
+            // Always refresh bids component if available
             if (window.BidsComponent) {
-                BidsComponent.refreshBids();
+                await BidsComponent.refreshBids();
             }
-            if (window.ProjectsComponent && window.location.hash.includes('/projects/')) {
-                const projectId = window.location.hash.split('/').pop();
-                ProjectsComponent.renderDetail(projectId);
+            
+            // Check if we're on a project-related page
+            if (currentHash.includes('/projects')) {
+                if (currentHash.includes(`/projects/${projectId}`)) {
+                    // On project detail page - refresh the detail view
+                    if (window.ProjectsComponent) {
+                        await ProjectsComponent.renderDetail(projectId);
+                    }
+                } else {
+                    // On projects list page - refresh the entire list
+                    // This is the KEY FIX - refresh the projects list so has_bid gets updated
+                    if (window.ProjectsComponent) {
+                        await ProjectsComponent.loadProjects();
+                    }
+                }
+            }
+            
+            // Also refresh available projects in the bids component if visible
+            if (window.BidsComponent && currentHash.includes('/bids')) {
+                await BidsComponent.loadAvailableProjects();
             }
             
         } catch (error) {
-            console.error('Error submitting bid:', error);
-            
-            // More detailed error handling
-            if (error.response && error.response.data) {
-                const errorData = error.response.data;
-                if (errorData.errors && Array.isArray(errorData.errors)) {
-                    // Express-validator returns an array of errors
-                    const errorMessages = errorData.errors.map(e => e.msg || e.message).join(', ');
-                    App.showError(`Validation failed: ${errorMessages}`);
-                } else {
-                    App.showError(errorData.error || errorData.message || 'Failed to submit bid');
-                }
-            } else {
-                App.showError(error.message || 'Failed to submit bid');
-            }
+            App.showError('Failed to submit bid: ' + (error.message || 'Unknown error'));
         } finally {
             App.showLoading(false);
         }

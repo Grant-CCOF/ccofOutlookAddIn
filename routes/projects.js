@@ -29,6 +29,24 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
             projects = await ProjectModel.getAll();
         }
+
+        if (req.user.role === 'installation_company' && projects.length > 0) {
+            const projectIds = projects.map(p => p.id);
+            const userBids = await BidModel.getUserBidsForProjects(req.user.id, projectIds);
+            
+            // Add has_bid to each project
+            projects.forEach(project => {
+                const userBid = userBids[project.id];
+                project.has_bid = !!userBid;
+                project.user_bid_status = userBid ? userBid.status : null;
+                
+                // Don't reveal total bid count or other bid details
+                delete project.bid_count;
+                delete project.lowest_bid;
+                delete project.highest_bid;
+                delete project.average_bid;
+            });
+        }
         
         res.json(projects);
     } catch (error) {

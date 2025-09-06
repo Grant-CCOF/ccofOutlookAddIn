@@ -334,8 +334,6 @@ const BidsComponent = {
                 <td>${bid.project_title || 'Project #' + bid.project_id}</td>
                 <td>
                     <div class="d-flex align-items-center">
-                        <img src="${bid.user_avatar || '/images/default-avatar.png'}" 
-                             class="user-avatar-sm mr-2" alt="">
                         <div>
                             <div>${bid.user_name || 'Unknown'}</div>
                             <small class="text-muted">${bid.company || ''}</small>
@@ -571,21 +569,39 @@ const BidsComponent = {
                 return;
             }
             
-            container.innerHTML = projects.slice(0, 5).map(project => `
-                <div class="project-list-item">
-                    <div class="project-info">
-                        <h5>${project.title}</h5>
-                        <div class="project-meta">
-                            <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
-                            <span><i class="fas fa-calendar"></i> Due ${Formatter.date(project.bid_due_date)}</span>
+            container.innerHTML = projects.slice(0, 5).map(project => {
+                // Check if user has already bid on this project
+                const hasBid = project.has_bid;
+                const bidStatus = project.user_bid_status;
+                
+                return `
+                    <div class="project-list-item">
+                        <div class="project-info">
+                            <h5>${project.title}</h5>
+                            <div class="project-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
+                                <span><i class="fas fa-calendar"></i> Due ${Formatter.date(project.bid_due_date)}</span>
+                                ${hasBid ? `
+                                    <span class="badge badge-info ml-2">
+                                        <i class="fas fa-check"></i> Bid Submitted
+                                    </span>
+                                ` : ''}
+                            </div>
                         </div>
+                        ${hasBid ? `
+                            <button class="btn btn-info btn-sm" 
+                                    onclick="ProjectsComponent.viewUserBid(${project.id})">
+                                <i class="fas fa-eye"></i> View Bid
+                            </button>
+                        ` : `
+                            <button class="btn btn-primary btn-sm" 
+                                    onclick="ProjectsComponent.showBidModal(${project.id})">
+                                <i class="fas fa-gavel"></i> Place Bid
+                            </button>
+                        `}
                     </div>
-                    <button class="btn btn-primary btn-sm" 
-                            onclick="ProjectsComponent.showBidModal(${project.id})">
-                        Place Bid
-                    </button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
             
         } catch (error) {
             Config.error('Failed to load available projects:', error);

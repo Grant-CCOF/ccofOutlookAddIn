@@ -2,55 +2,54 @@
 
 const ProjectTemplates = {
     // Get project card template
-    getProjectCard(project, options = {}) {
-        const {
-            showActions = true,
-            showBidButton = false,
-            showEditButton = false,
-            showStats = true,
-            compact = false
-        } = options;
-        
+    getProjectCard(project) {
+        const user = State.getUser();
+        const isManager = user.id === project.project_manager_id;
+        const isContractor = ['installation_company', 'operations'].includes(user.role);
         const status = Formatter.status(project.status, 'project');
         
+        // UPDATED: Determine which button to show for contractors
+        const showBidButton = isContractor && project.status === 'bidding' && !project.has_bid;
+        const showViewBidButton = isContractor && project.has_bid;
+        
         return `
-            <div class="project-card ${compact ? 'project-card-compact' : ''}" 
-                 data-project-id="${project.id}">
+            <div class="project-card" data-project-id="${project.id}">
                 <div class="project-card-header">
-                    <h4 class="project-card-title">
-                        <a href="#/projects/${project.id}">${project.title}</a>
-                    </h4>
-                    <span class="badge badge-${status.color}">
-                        <i class="fas ${status.icon}"></i> ${status.label}
-                    </span>
+                    <h5 class="project-title">${project.title}</h5>
+                    ${status}
                 </div>
                 
-                ${!compact ? `
-                    <div class="project-card-body">
-                        <p class="project-card-description">
-                            ${Formatter.truncate(project.description, 150)}
-                        </p>
-                        
-                        ${showStats ? this.getProjectStats(project) : ''}
-                        
-                        ${project.show_max_bid && project.max_bid ? `
-                            <div class="project-max-bid">
-                                <i class="fas fa-dollar-sign"></i>
-                                Max Bid: <strong>${Formatter.currency(project.max_bid)}</strong>
-                            </div>
-                        ` : ''}
+                <div class="project-card-body">
+                    <div class="project-meta">
+                        <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
+                        <span><i class="fas fa-calendar"></i> Due ${Formatter.date(project.bid_due_date)}</span>
+                        <span><i class="fas fa-truck"></i> Delivery ${Formatter.date(project.delivery_date)}</span>
                     </div>
-                ` : ''}
-                
-                ${showActions ? `
-                    <div class="project-card-footer">
-                        <div class="project-card-meta">
-                            <span><i class="fas fa-user"></i> ${project.manager_name || 'Unknown'}</span>
-                            <span><i class="fas fa-calendar"></i> ${Formatter.timeAgo(project.created_at)}</span>
+                    
+                    ${project.description ? `
+                        <p class="project-description">${project.description}</p>
+                    ` : ''}
+                    
+                    ${project.show_max_bid && project.max_bid ? `
+                        <div class="project-budget">
+                            <strong>Max Budget:</strong> ${Formatter.currency(project.max_bid)}
                         </div>
-                        
-                        <div class="project-card-actions">
-                            ${showEditButton ? `
+                    ` : ''}
+                    
+                    ${isManager || user.role === 'admin' ? `
+                        <div class="project-stats">
+                            <span><i class="fas fa-gavel"></i> ${project.bid_count || 0} bids</span>
+                            ${project.lowest_bid ? `
+                                <span>Low: ${Formatter.currency(project.lowest_bid)}</span>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+                
+                ${(isManager || showBidButton || showViewBidButton) ? `
+                    <div class="project-card-footer">
+                        <div class="btn-group">
+                            ${isManager ? `
                                 <button class="btn btn-sm btn-outline" 
                                         onclick="ProjectsComponent.editProject(${project.id})">
                                     <i class="fas fa-edit"></i> Edit
@@ -61,6 +60,13 @@ const ProjectTemplates = {
                                 <button class="btn btn-sm btn-primary" 
                                         onclick="ProjectsComponent.showBidModal(${project.id})">
                                     <i class="fas fa-gavel"></i> Place Bid
+                                </button>
+                            ` : ''}
+                            
+                            ${showViewBidButton ? `
+                                <button class="btn btn-sm btn-info" 
+                                        onclick="ProjectsComponent.viewUserBid(${project.id})">
+                                    <i class="fas fa-eye"></i> View ${project.user_bid_status === 'won' ? 'Winning' : 'Your'} Bid
                                 </button>
                             ` : ''}
                             
@@ -309,10 +315,32 @@ const ProjectTemplates = {
             }
         }
         
+        // UPDATED SECTION: Check if contractor has already placed a bid
         if (isContractor && project.status === 'bidding') {
+            if (project.has_bid) {
+                // Installer has already placed a bid - show View Bid button
+                actions.push(`
+                    <button class="btn btn-info" onclick="ProjectsComponent.viewUserBid(${project.id})">
+                        <i class="fas fa-eye"></i> View Your Bid
+                    </button>
+                `);
+            } else {
+                // Installer hasn't placed a bid yet - show Place Bid button
+                actions.push(`
+                    <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
+                        <i class="fas fa-gavel"></i> Place Bid
+                    </button>
+                `);
+            }
+        }
+        
+        // Also show View Bid button for other statuses if the installer has a bid
+        if (isContractor && project.has_bid && project.status !== 'bidding') {
+            const statusLabel = project.user_bid_status === 'won' ? 'Winning' : 
+                            project.user_bid_status === 'lost' ? 'Lost' : 'Your';
             actions.push(`
-                <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
-                    <i class="fas fa-gavel"></i> Place Bid
+                <button class="btn btn-info" onclick="ProjectsComponent.viewUserBid(${project.id})">
+                    <i class="fas fa-eye"></i> View ${statusLabel} Bid
                 </button>
             `);
         }

@@ -514,8 +514,6 @@ const UsersComponent = {
             <tr>
                 <td>
                     <div class="d-flex align-items-center">
-                        <img src="${user.avatar || '/images/default-avatar.png'}" 
-                             class="user-avatar-sm mr-2" alt="${user.name}">
                         <div>
                             <div class="font-weight-medium">${user.name}</div>
                             <small class="text-muted">${user.email}</small>

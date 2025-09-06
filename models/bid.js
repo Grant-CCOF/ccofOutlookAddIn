@@ -393,6 +393,32 @@ class BidModel {
         const result = await db.get(sql, [userId]);
         return result.rate || 0;
     }
+
+    static async getUserBidsForProjects(userId, projectIds) {
+        if (!projectIds || projectIds.length === 0) {
+            return {};
+        }
+        
+        const placeholders = projectIds.map(() => '?').join(',');
+        const sql = `
+            SELECT project_id, id, status, amount, created_at 
+            FROM bids 
+            WHERE user_id = ? 
+            AND project_id IN (${placeholders})
+            AND is_test_bid = 0
+        `;
+        
+        const params = [userId, ...projectIds];
+        const bids = await db.all(sql, params);
+        
+        // Convert to a map for easy lookup
+        const bidMap = {};
+        bids.forEach(bid => {
+            bidMap[bid.project_id] = bid;
+        });
+        
+        return bidMap;
+    }
 }
 
 module.exports = BidModel;
