@@ -6,6 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const schedulerService = require('./services/scheduler');
 
 // Initialize Express app
 const app = express();
@@ -47,6 +48,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
 const fileRoutes = require('./routes/files');
 const ratingRoutes = require('./routes/ratings');
+const adminRoutes = require('./routes/admin');
 
 // Import services
 const logger = require('./utils/logger');
@@ -165,6 +167,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/ratings', ratingRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Catch all route - serve index.html for client-side routing
 app.get('*', (req, res) => {
@@ -233,6 +236,10 @@ async function startServer() {
         await fileService.ensureUploadDirectories();
         await database.initialize();
         logger.info('Database initialized successfully');
+
+        // Initialize the scheduler service
+        await schedulerService.initialize();
+        logger.info('Scheduler service started');
         
         const PORT = process.env.PORT || 3000;
         const HOST = '0.0.0.0';
@@ -280,6 +287,7 @@ process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, starting graceful shutdown...');
     server.close(() => logger.info('HTTP server closed'));
     io.close(() => logger.info('Socket.IO closed'));
+    schedulerService.stop();
     try {
         await database.close();
         logger.info('Database connection closed');
@@ -297,6 +305,7 @@ process.on('SIGINT', async () => {
     logger.info('SIGINT received, starting graceful shutdown...');
     server.close(() => logger.info('HTTP server closed'));
     io.close(() => logger.info('Socket.IO closed'));
+    schedulerService.stop();
     try {
         await database.close();
         logger.info('Database connection closed');

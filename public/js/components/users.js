@@ -768,9 +768,13 @@ const UsersComponent = {
             const user = await API.users.getById(userId);
             const stats = await API.users.getStats(userId);
             
-            this.state.selectedUser = user;
+            // ADD THIS: Fetch certifications
+            const certifications = await API.files.getUserCertifications(userId);
             
-            const content = this.renderUserDetail(user, stats);
+            this.state.selectedUser = user;
+            this.state.certifications = certifications; // Store certifications in state
+            
+            const content = this.renderUserDetail(user, stats, certifications); // Pass certifications
             DOM.setHTML('pageContent', content);
             
         } catch (error) {
@@ -783,9 +787,11 @@ const UsersComponent = {
     },
     
     // Render user detail view
-    renderUserDetail(user, stats) {
+    renderUserDetail(user, stats, certifications) {
         const status = this.getUserStatus(user);
         const roleConfig = Config.USER_ROLES[user.role] || {};
+        const currentUser = Auth.getUser();
+        const canViewCertifications = currentUser.role === 'admin' || currentUser.role === 'project_manager';
         
         return `
             <div class="user-detail">
@@ -793,8 +799,9 @@ const UsersComponent = {
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-4 text-center">
+                                <!-- Existing user info -->
                                 <img src="${user.avatar || '/images/default-avatar.png'}" 
-                                     class="user-avatar-large mb-3" alt="${user.name}">
+                                    class="user-avatar-large mb-3" alt="${user.name}">
                                 <h3>${user.name}</h3>
                                 <p class="text-muted">${user.email}</p>
                                 <span class="badge badge-${roleConfig.color || 'secondary'} mb-2">
@@ -810,6 +817,7 @@ const UsersComponent = {
                             <div class="col-md-8">
                                 <h4>User Information</h4>
                                 <dl class="row">
+                                    <!-- Existing user details -->
                                     <dt class="col-sm-3">Username</dt>
                                     <dd class="col-sm-9">${user.username}</dd>
                                     
@@ -831,8 +839,84 @@ const UsersComponent = {
                         </div>
                     </div>
                 </div>
+                
+                <!-- ADD CERTIFICATIONS CARD HERE -->
+                ${canViewCertifications ? `
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Certifications</h5>
+                        </div>
+                        <div class="card-body">
+                            ${this.renderCertifications(certifications)}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
+    },
+
+    // Add this method to UsersComponent
+    renderCertifications(certifications) {
+        if (!certifications || certifications.length === 0) {
+            return `
+                <p class="text-muted text-center mb-0">
+                    <i class="fas fa-certificate"></i><br>
+                    No certifications uploaded yet
+                </p>
+            `;
+        }
+        
+        return `
+            <div class="certifications-list">
+                ${certifications.map(cert => `
+                    <div class="certification-item mb-3 p-2 border rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="fas ${this.getFileIcon(cert.original_name)} mr-2"></i>
+                                    <strong>${cert.original_name}</strong>
+                                </div>
+                                ${cert.description ? `
+                                    <small class="text-muted d-block mb-1">${cert.description}</small>
+                                ` : ''}
+                                <small class="text-muted">
+                                    Uploaded ${Formatter.timeAgo(cert.created_at)}
+                                </small>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary" 
+                                        onclick="UsersComponent.downloadCertification(${cert.id}, '${cert.original_name.replace(/'/g, "\\'")}')">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    // Helper method for file icons
+    getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const iconMap = {
+            'pdf': 'fa-file-pdf text-danger',
+            'doc': 'fa-file-word text-primary',
+            'docx': 'fa-file-word text-primary',
+            'jpg': 'fa-file-image text-success',
+            'jpeg': 'fa-file-image text-success',
+            'png': 'fa-file-image text-success'
+        };
+        return iconMap[ext] || 'fa-file';
+    },
+
+    // Download certification method
+    async downloadCertification(certId, filename) {
+        try {
+            await API.files.download(certId, filename);
+        } catch (error) {
+            App.showError('Failed to download certification');
+        }
     },
     
     // Render user stats

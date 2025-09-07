@@ -295,8 +295,9 @@ router.post('/:id/start-bidding', [
             return res.status(400).json({ error: 'Project must be in draft status to start bidding' });
         }
         
-        await ProjectModel.updateStatus(req.params.id, 'bidding');
-        
+        // Schedule automatic closure
+        await schedulerService.scheduleNewProject(req.params.id);
+
         // Notify installation companies
         await NotificationService.broadcastToRole(
             'installation_company',

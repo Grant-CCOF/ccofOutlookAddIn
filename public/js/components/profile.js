@@ -118,18 +118,17 @@ const ProfileComponent = {
                         </div>
                         
                         <!-- Certifications Card -->
-                            <div class="card mt-3">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="card-title mb-0">Certifications</h5>
-                                    ${isOwnProfile ? `
-                                        <button class="btn btn-sm btn-primary" onclick="ProfileComponent.showUploadCertificationModal()">
-                                            <i class="fas fa-plus"></i> Add
-                                        </button>
-                                    ` : ''}
-                                </div>
-                                <div class="card-body">
-                                    ${this.renderCertifications(certifications, isOwnProfile)}
-                                </div>
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Certifications</h5>
+                                ${isOwnProfile ? `
+                                    <button class="btn btn-sm btn-primary" onclick="ProfileComponent.showUploadCertificationModal()">
+                                        <i class="fas fa-plus"></i> Add
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="card-body">
+                                ${this.renderCertifications(certifications, isOwnProfile)}
                             </div>
                         </div>
                         

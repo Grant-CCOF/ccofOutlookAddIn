@@ -274,6 +274,44 @@ class ProjectModel {
         const sql = `UPDATE projects SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
         return db.run(sql, [id]);
     }
+
+    static async updateStatus(id, status) {
+        const sql = `
+            UPDATE projects 
+            SET status = ?, 
+                updated_at = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        `;
+        
+        try {
+            await db.run(sql, [status, id]);
+            logger.info(`Project ${id} status updated to: ${status}`);
+            return true;
+        } catch (error) {
+            logger.error('Error updating project status:', error);
+            throw error;
+        }
+    }
+
+    static async getExpiredBiddingProjects() {
+        const sql = `
+            SELECT p.*, 
+                u.name as project_manager_name,
+                u.email as project_manager_email
+            FROM projects p
+            LEFT JOIN users u ON p.project_manager_id = u.id
+            WHERE p.status = 'bidding' 
+            AND datetime(p.bid_due_date) <= datetime('now')
+        `;
+        
+        try {
+            return await db.all(sql);
+        } catch (error) {
+            logger.error('Error fetching expired bidding projects:', error);
+            throw error;
+        }
+    }
+
 }
 
 module.exports = ProjectModel;
