@@ -144,7 +144,7 @@ const ProjectModals = {
                                 class="form-control" 
                                 name="delivery_date" 
                                 id="deliveryDate"
-                                value="${project ? this.formatDateForInput(project.delivery_date, true) : ''}"
+                                value="${project ? this.formatDateForInput(project.delivery_date) : ''}"
                                 required>
                         </div>
                     </div>

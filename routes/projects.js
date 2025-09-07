@@ -294,9 +294,6 @@ router.post('/:id/start-bidding', [
         if (project.status !== 'draft') {
             return res.status(400).json({ error: 'Project must be in draft status to start bidding' });
         }
-        
-        // Schedule automatic closure
-        await schedulerService.scheduleNewProject(req.params.id);
 
         // Notify installation companies
         await NotificationService.broadcastToRole(
@@ -488,7 +485,5 @@ router.post('/:id/admin-reset', [
         res.status(500).json({ error: 'Failed to reset project' });
     }
 });
-
-
 
 module.exports = router;
