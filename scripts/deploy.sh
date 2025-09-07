@@ -351,29 +351,145 @@ install_app_files() {
 create_env_file() {
     print_status "Creating environment file..."
     
-    cat > $APP_DIR/.env << EOF
+    # Look for SECRETS FILE first
+    SECRETS_FILE=""
+    
+    # Check for secrets file in various locations
+    if [[ -f "$HOME/.cc-platform-secrets" ]]; then
+        SECRETS_FILE="$HOME/.cc-platform-secrets"
+        print_status "Found secrets file at $HOME/.cc-platform-secrets"
+    elif [[ -f "/etc/cc-platform/secrets" ]]; then
+        SECRETS_FILE="/etc/cc-platform/secrets"
+        print_status "Found secrets file at /etc/cc-platform/secrets"
+    elif [[ -f "./secrets.env" ]]; then
+        SECRETS_FILE="./secrets.env"
+        print_status "Found secrets file at ./secrets.env"
+    fi
+    
+    # Load secrets if file exists
+    if [[ -n "$SECRETS_FILE" ]]; then
+        print_status "Loading secrets from secure file..."
+        source "$SECRETS_FILE"
+    else
+        print_warning "No secrets file found. You'll need to configure manually."
+        print_status "Create one of these files:"
+        print_status "  - $HOME/.cc-platform-secrets"
+        print_status "  - /etc/cc-platform/secrets"
+    fi
+    
+    # Look for env template file in multiple possible locations
+    ENV_TEMPLATE=""
+    
+    if [[ -f "$APP_DIR/.env.template" ]]; then
+        ENV_TEMPLATE="$APP_DIR/.env.template"
+        print_status "Found env template at $APP_DIR/.env.template"
+    elif [[ -f ".env.template" ]]; then
+        ENV_TEMPLATE=".env.template"
+        print_status "Found env template at .env.template"
+    elif [[ -f "configs/.env.template" ]]; then
+        ENV_TEMPLATE="configs/.env.template"
+        print_status "Found env template at configs/.env.template"
+    elif [[ -f "../.env.template" ]]; then
+        ENV_TEMPLATE="../.env.template"
+        print_status "Found env template at ../.env.template"
+    fi
+    
+    if [[ -n "$ENV_TEMPLATE" ]]; then
+        # Copy the template to the app directory
+        cp "$ENV_TEMPLATE" $APP_DIR/.env
+        
+        # Generate secure values for anything not provided in secrets file
+        JWT_SECRET_VALUE=${JWT_SECRET:-$(openssl rand -base64 32)}
+        ADMIN_PASSWORD_VALUE=${ADMIN_PASSWORD:-$(openssl rand -base64 16)}
+        SESSION_SECRET_VALUE=${SESSION_SECRET:-$(openssl rand -base64 32)}
+        
+        # Replace placeholders with actual values using simple sed
+        sed -i "s|{{JWT_SECRET}}|$JWT_SECRET_VALUE|g" $APP_DIR/.env
+        sed -i "s|{{ADMIN_PASSWORD}}|$ADMIN_PASSWORD_VALUE|g" $APP_DIR/.env
+        sed -i "s|{{SESSION_SECRET}}|$SESSION_SECRET_VALUE|g" $APP_DIR/.env
+        sed -i "s|{{NODE_ENV}}|production|g" $APP_DIR/.env
+        sed -i "s|{{APP_NAME}}|${APP_NAME}|g" $APP_DIR/.env
+        sed -i "s|{{APP_DIR}}|${APP_DIR}|g" $APP_DIR/.env
+        sed -i "s|{{PORT}}|${PORT:-3000}|g" $APP_DIR/.env
+        
+        # Replace domain and URL values
+        sed -i "s|{{DOMAIN}}|${DOMAIN:-localhost}|g" $APP_DIR/.env
+        sed -i "s|{{APP_URL}}|${APP_URL:-http://localhost:3000}|g" $APP_DIR/.env
+        
+        # Replace email configuration
+        sed -i "s|{{EMAIL_FROM}}|${EMAIL_FROM:-noreply@ccofficefurniture.com}|g" $APP_DIR/.env
+        sed -i "s|{{ADMIN_EMAIL}}|${ADMIN_EMAIL:-grant@ccofficefurniture.com}|g" $APP_DIR/.env
+        sed -i "s|{{TEST_EMAIL}}|${TEST_EMAIL:-grant@ccofficefurniture.com}|g" $APP_DIR/.env
+        
+        # Replace Microsoft credentials (only if provided)
+        if [[ -n "$MICROSOFT_TENANT_ID" ]]; then
+            sed -i "s|{{MICROSOFT_TENANT_ID}}|$MICROSOFT_TENANT_ID|g" $APP_DIR/.env
+        else
+            sed -i "s|{{MICROSOFT_TENANT_ID}}|your-tenant-id-here|g" $APP_DIR/.env
+        fi
+        
+        if [[ -n "$MICROSOFT_CLIENT_ID" ]]; then
+            sed -i "s|{{MICROSOFT_CLIENT_ID}}|$MICROSOFT_CLIENT_ID|g" $APP_DIR/.env
+        else
+            sed -i "s|{{MICROSOFT_CLIENT_ID}}|your-client-id-here|g" $APP_DIR/.env
+        fi
+        
+        if [[ -n "$MICROSOFT_CLIENT_SECRET" ]]; then
+            sed -i "s|{{MICROSOFT_CLIENT_SECRET}}|$MICROSOFT_CLIENT_SECRET|g" $APP_DIR/.env
+        else
+            sed -i "s|{{MICROSOFT_CLIENT_SECRET}}|your-client-secret-here|g" $APP_DIR/.env
+        fi
+        
+        print_success "Environment file created from template"
+        
+        # If admin password was generated (not provided in secrets), save for display
+        if [[ -z "$ADMIN_PASSWORD" ]]; then
+            echo "$ADMIN_PASSWORD_VALUE" > /tmp/${APP_NAME}_admin_pass.tmp
+        fi
+        
+    else
+        print_warning ".env.template not found, creating default configuration..."
+        
+        # Fall back to creating the configuration inline
+        JWT_SECRET_VALUE=${JWT_SECRET:-$(openssl rand -base64 32)}
+        ADMIN_PASSWORD_VALUE=${ADMIN_PASSWORD:-$(openssl rand -base64 16)}
+        SESSION_SECRET_VALUE=${SESSION_SECRET:-$(openssl rand -base64 32)}
+        
+        cat > $APP_DIR/.env << EOF
 # Environment
 NODE_ENV=production
 
 # Server Configuration
 PORT=3000
+HOST=0.0.0.0
+
+# Application URLs
+APP_URL=${APP_URL:-http://localhost:3000}
+DOMAIN=${DOMAIN:-localhost}
 
 # Database Configuration
 DATABASE_PATH=./database.sqlite
 
 # Security Configuration
-JWT_SECRET=$(openssl rand -base64 32)
+JWT_SECRET=$JWT_SECRET_VALUE
+SESSION_SECRET=$SESSION_SECRET_VALUE
 BCRYPT_ROUNDS=10
 
 # File Upload Configuration
 UPLOAD_DIR=uploads/
 MAX_FILE_SIZE=10485760
 
-# Email Configuration (Configure these with your SMTP settings)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=
-EMAIL_PASS=
+# Microsoft Email Configuration (Office 365)
+MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-your-tenant-id-here}
+MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-your-client-id-here}
+MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-your-client-secret-here}
+EMAIL_FROM=${EMAIL_FROM:-noreply@ccofficefurniture.com}
+ADMIN_EMAIL=${ADMIN_EMAIL:-grant@ccofficefurniture.com}
+TEST_EMAIL=${TEST_EMAIL:-grant@ccofficefurniture.com}
+
+# Email Settings
+DISABLE_EMAIL=false
+SEND_STARTUP_EMAIL=true
 
 # Rate Limiting Configuration
 RATE_LIMIT_WINDOW_MS=900000
@@ -384,13 +500,64 @@ CORS_ORIGIN=*
 
 # Default Admin Configuration
 DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=admin123
+DEFAULT_ADMIN_PASSWORD=$ADMIN_PASSWORD_VALUE
+DEFAULT_ADMIN_EMAIL=${ADMIN_EMAIL:-grant@ccofficefurniture.com}
 
-# Public Directory
-PUBLIC_DIR=public
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=./logs/app.log
+
+# Socket.io Configuration
+ENABLE_WEBSOCKETS=true
+WEBSOCKET_CORS_ORIGIN=*
+
+# Feature Flags
+ENABLE_REGISTRATION=true
+ENABLE_FILE_UPLOADS=true
+ENABLE_NOTIFICATIONS=true
+MAINTENANCE_MODE=false
 EOF
+        
+        # Save admin password if generated
+        if [[ -z "$ADMIN_PASSWORD" ]]; then
+            echo "$ADMIN_PASSWORD_VALUE" > /tmp/${APP_NAME}_admin_pass.tmp
+        fi
+        
+        print_success "Default environment file created"
+    fi
     
-    print_success "Environment file created"
+    # Set proper permissions
+    chmod 600 $APP_DIR/.env
+    chown $APP_USER:$APP_USER $APP_DIR/.env
+    
+    # Display important information
+    print_status "Environment file created at: $APP_DIR/.env"
+    
+    # Show generated admin password if applicable
+    if [[ -f "/tmp/${APP_NAME}_admin_pass.tmp" ]]; then
+        ADMIN_PASS=$(cat /tmp/${APP_NAME}_admin_pass.tmp)
+        rm /tmp/${APP_NAME}_admin_pass.tmp
+        
+        echo
+        print_warning "IMPORTANT - Save these credentials:"
+        echo "========================================="
+        echo "Admin Username: admin"
+        echo "Admin Password: $ADMIN_PASS"
+        echo "========================================="
+        echo
+        print_status "This password was auto-generated. To use your own password,"
+        print_status "add ADMIN_PASSWORD to your secrets file."
+    fi
+    
+    # Remind about Microsoft configuration if not provided
+    if [[ -z "$MICROSOFT_TENANT_ID" ]] || [[ "$MICROSOFT_TENANT_ID" == "your-tenant-id-here" ]]; then
+        echo
+        print_warning "Microsoft email credentials not configured!"
+        print_status "To enable email functionality:"
+        print_status "1. Add credentials to your secrets file"
+        print_status "2. Or edit $APP_DIR/.env directly"
+        echo
+    fi
 }
 
 # Function to update package.json for production

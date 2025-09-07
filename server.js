@@ -53,6 +53,25 @@ const adminRoutes = require('./routes/admin');
 // Import services
 const logger = require('./utils/logger');
 const fileService = require('./services/fileService');
+const emailService = require('./services/microsoftEmailService');
+
+async function sendStartupNotification() {
+    try {
+        // Wait a moment for the server to fully start
+        setTimeout(async () => {
+            if (process.env.NODE_ENV === 'production' || process.env.SEND_STARTUP_EMAIL === 'true') {
+                const result = await emailService.sendAppStartupNotification();
+                if (result.success) {
+                    console.log('✓ Startup notification email sent to admin');
+                } else {
+                    console.log('⚠️  Failed to send startup notification email');
+                }
+            }
+        }, 3000); // Wait 3 seconds after startup
+    } catch (error) {
+        console.error('Error sending startup notification:', error);
+    }
+}
 
 // Security middleware
 app.use(helmet({
@@ -331,5 +350,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Start the server
 startServer();
+
+// Send Startup notification
+sendStartupNotification();
 
 module.exports = { app, server, io };

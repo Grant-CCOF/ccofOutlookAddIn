@@ -3,7 +3,7 @@ const router = express.Router();
 const { body } = require('express-validator');
 const UserModel = require('../models/user');
 const AuthService = require('../services/authService');
-const emailService = require('../services/emailService');
+//const emailService = require('../services/emailService');
 const { handleValidationErrors } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
@@ -104,7 +104,7 @@ router.post('/register', [
         const user = await UserModel.getById(userId);
         
         // Send welcome email
-        await emailService.sendWelcomeEmail(user);
+        // await emailService.sendWelcomeEmail(user);
         
         logger.info(`New user registered: ${username} (${email})`);
         
@@ -249,7 +249,7 @@ router.post('/forgot-password', [
         // In production, store this token in database with expiry
         // For now, we'll send it in the email
         
-        await emailService.sendPasswordResetEmail(user, resetToken);
+        // await emailService.sendPasswordResetEmail(user, resetToken);
         
         logger.info(`Password reset requested for: ${email}`);
         
