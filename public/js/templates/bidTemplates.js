@@ -36,7 +36,7 @@ const BidTemplates = {
                         <div class="bid-detail">
                             <span class="detail-label">Delivery Date</span>
                             <span class="detail-value">
-                                ${Formatter.date(bid.alternate_delivery_date || project.delivery_date)}
+                                ${Formatter.datetime(bid.alternate_delivery_date || project.delivery_date)}
                             </span>
                         </div>
                         <div class="bid-detail">
@@ -52,7 +52,7 @@ const BidTemplates = {
                     ${bid.alternate_delivery_date ? `
                         <div class="alert alert-info mt-3">
                             <i class="fas fa-calendar-alt"></i>
-                            <strong>Alternate Delivery Date:</strong> ${Formatter.date(bid.alternate_delivery_date)}
+                            <strong>Alternate Delivery Date:</strong> ${Formatter.datetime(bid.alternate_delivery_date)}
                         </div>
                     ` : ''}
                     
@@ -149,7 +149,7 @@ const BidTemplates = {
                         ${bid.status}
                     </span>
                 </td>
-                <td>${Formatter.date(bid.created_at)}</td>
+                <td>${Formatter.datetime(bid.created_at)}</td>
                 <td>
                     <button class="btn btn-sm btn-info" onclick="BidsComponent.viewBidDetails(${bid.id})">
                         <i class="fas fa-eye"></i>
@@ -177,7 +177,7 @@ const BidTemplates = {
         
         return `
             <span class="text-${earlier ? 'success' : 'warning'}">
-                ${Formatter.date(alternateDate)}
+                ${Formatter.datetime(alternateDate)}
                 <br>
                 <small>(${Math.abs(daysDiff)} days ${earlier ? 'earlier' : 'later'})</small>
             </span>
@@ -240,7 +240,7 @@ const BidTemplates = {
                                 
                                 ${bid.alternate_delivery_date ? `
                                     <dt>Proposed Delivery Date</dt>
-                                    <dd>${Formatter.date(bid.alternate_delivery_date)}</dd>
+                                    <dd>${Formatter.datetime(bid.alternate_delivery_date)}</dd>
                                 ` : ''}
                             </dl>
                         </div>
@@ -257,7 +257,7 @@ const BidTemplates = {
                                 <dd>${project.zip_code || 'N/A'}</dd>
                                 
                                 <dt>Original Delivery Date</dt>
-                                <dd>${Formatter.date(project.delivery_date)}</dd>
+                                <dd>${Formatter.datetime(project.delivery_date)}</dd>
                                 
                                 <dt>Project Status</dt>
                                 <dd>${project.status || 'Unknown'}</dd>

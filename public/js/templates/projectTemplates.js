@@ -22,8 +22,8 @@ const ProjectTemplates = {
                 <div class="project-card-body">
                     <div class="project-meta">
                         <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
-                        <span><i class="fas fa-calendar"></i> Due ${Formatter.date(project.bid_due_date)}</span>
-                        <span><i class="fas fa-truck"></i> Delivery ${Formatter.date(project.delivery_date)}</span>
+                        <span><i class="fas fa-calendar"></i> Due ${Formatter.datetime(project.bid_due_date)}</span>
+                        <span><i class="fas fa-truck"></i> Delivery ${Formatter.datetime(project.delivery_date)}</span>
                     </div>
                     
                     ${project.description ? `
@@ -49,7 +49,7 @@ const ProjectTemplates = {
                 ${(isManager || showBidButton || showViewBidButton) ? `
                     <div class="project-card-footer">
                         <div class="btn-group">
-                            ${isManager ? `
+                            ${isManager && project.status === 'draft' ? `
                                 <button class="btn btn-sm btn-outline" 
                                         onclick="ProjectsComponent.editProject(${project.id})">
                                     <i class="fas fa-edit"></i> Edit
@@ -91,11 +91,11 @@ const ProjectTemplates = {
                 </div>
                 <div class="project-stat">
                     <span class="project-stat-icon"><i class="fas fa-clock"></i></span>
-                    <span class="project-stat-value">Due ${Formatter.date(project.bid_due_date)}</span>
+                    <span class="project-stat-value">Due ${Formatter.datetime(project.bid_due_date)}</span>
                 </div>
                 <div class="project-stat">
                     <span class="project-stat-icon"><i class="fas fa-truck"></i></span>
-                    <span class="project-stat-value">${Formatter.date(project.delivery_date)}</span>
+                    <span class="project-stat-value">${Formatter.datetime(project.delivery_date)}</span>
                 </div>
                 <div class="project-stat">
                     <span class="project-stat-icon"><i class="fas fa-gavel"></i></span>
@@ -133,7 +133,7 @@ const ProjectTemplates = {
                     </div>
                     <div class="project-meta">
                         <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
-                        <span><i class="fas fa-calendar"></i> Due ${Formatter.date(project.bid_due_date)}</span>
+                        <span><i class="fas fa-calendar"></i> Due ${Formatter.datetime(project.bid_due_date)}</span>
                         <span><i class="fas fa-gavel"></i> ${project.bid_count || 0} bids</span>
                         ${project.show_max_bid && project.max_bid ? 
                             `<span><i class="fas fa-dollar-sign"></i> Max: ${Formatter.currency(project.max_bid)}</span>` 
@@ -370,7 +370,7 @@ const ProjectTemplates = {
                     <dd>${Formatter.datetime(project.bid_due_date)}</dd>
                     
                     <dt>Delivery Date</dt>
-                    <dd>${Formatter.date(project.delivery_date)}</dd>
+                    <dd>${Formatter.datetime(project.delivery_date)}</dd>
                     
                     ${project.show_max_bid && project.max_bid ? `
                         <dt>Maximum Bid</dt>
@@ -499,7 +499,7 @@ const ProjectTemplates = {
                 </td>
                 <td>${bid.company || '-'}</td>
                 <td class="font-weight-bold">${Formatter.currency(bid.amount)}</td>
-                <td>${Formatter.date(bid.delivery_date)}</td>
+                <td>${Formatter.datetime(bid.delivery_date)}</td>
                 <td>${Formatter.timeAgo(bid.created_at)}</td>
                 <td>
                     <span class="badge badge-${status.color}">
@@ -555,7 +555,7 @@ const ProjectTemplates = {
                         </div>
                         <div class="summary-stat">
                             <span class="stat-label">Due</span>
-                            <span class="stat-value">${Formatter.date(project.bid_due_date)}</span>
+                            <span class="stat-value">${Formatter.datetime(project.bid_due_date)}</span>
                         </div>
                         ${project.awarded_amount ? `
                             <div class="summary-stat">

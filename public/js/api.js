@@ -169,9 +169,15 @@ const API = {
             
             // Try to get error message from response
             try {
-                const error = await response.json();
-                throw new Error(error.message || error.error || 'Request failed');
-            } catch {
+                const errorData = await response.json();
+                // Check for different error message formats
+                const errorMessage = errorData.error || 
+                                errorData.message || 
+                                errorData.error?.message || 
+                                'Request failed';
+                throw new Error(errorMessage);
+            } catch (parseError) {
+                // If we can't parse the error, throw a generic one
                 throw new Error(`Request failed with status ${response.status}`);
             }
         }

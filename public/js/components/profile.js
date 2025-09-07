@@ -350,13 +350,11 @@ const ProfileComponent = {
 
     shouldShowOwnRatings(user) {
         const currentUser = State.getUser();
-        const isOwnProfile = currentUser && currentUser.id === user.id;
         const canViewRatings = currentUser.role === 'admin' || currentUser.role === 'project_manager';
         const hasRatings = ['installation_company', 'operations', 'admin'].includes(user.role);
         
         // Show if: PM/Admin viewing any installer OR installer viewing own profile
         if (canViewRatings && hasRatings) return true;
-        if (isOwnProfile && hasRatings) return true;
         
         return false;
     },

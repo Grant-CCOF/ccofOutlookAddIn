@@ -2583,3 +2583,38 @@ input[type="password"]:valid {
 [data-bs-toggle="tooltip"] {
     position: relative;
 }
+
+/* Tooltip styling for disabled buttons */
+button[disabled] {
+    position: relative;
+}
+
+button[disabled]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    font-size: 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    margin-bottom: 5px;
+}
+
+button[disabled]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+    margin-bottom: -5px;
+    z-index: 1001;
+    pointer-events: none;
+}

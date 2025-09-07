@@ -1081,3 +1081,62 @@
     background: #f8f9fa;
     border-radius: 8px;
 }
+
+/* Bidder Link Styles */
+.bidder-link {
+    color: #007bff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.bidder-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.bidder-link:active {
+    color: #004085;
+}
+
+/* Ensure the link stands out in the table */
+.bid-row .bidder-link strong {
+    font-weight: 600;
+}
+
+/* Add hover effect to entire row except when clicking links */
+.bid-row {
+    transition: background-color 0.2s ease;
+}
+
+.bid-row:hover {
+    background-color: #f8f9fa;
+}
+
+/* Styling for the restricted rating message */
+.no-rating-access {
+    padding: 2rem;
+    text-align: center;
+}
+
+.no-rating-access i {
+    opacity: 0.5;
+}
+
+.no-rating-access p {
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin-top: 1rem;
+}
+
+/* Make sure the bidder info column has enough space */
+.bidder-info {
+    min-width: 150px;
+}
+
+/* Ensure proper alignment when there's a position under the name */
+.bidder-info small {
+    display: block;
+    margin-top: 2px;
+}

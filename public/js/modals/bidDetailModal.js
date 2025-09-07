@@ -126,7 +126,7 @@
                                     <dd>${Formatter.datetime(bid.updated_at)}</dd>
                                     
                                     <dt>Proposed Delivery</dt>
-                                    <dd>${Formatter.date(bid.alternate_delivery_date || bid.project.delivery_date)}</dd>
+                                    <dd>${Formatter.datetime(bid.alternate_delivery_date || bid.project.delivery_date)}</dd>
                                     
                                     ${bid.alternate_delivery_time ? `
                                         <dt>Delivery Time</dt>
@@ -141,7 +141,16 @@
                                 <h5>Bidder Information</h5>
                                 <dl class="detail-list">
                                     <dt>Name</dt>
-                                    <dd>${bid.bidder.name}</dd>
+                                    <dd>
+                                        ${isManager ? `
+                                            <a href="#/users/${bid.bidder.id}" 
+                                                class="bidder-link"
+                                                onclick="BidDetailModal.closeModal(); Router.navigate('/users/${bid.bidder.id}'); return false;"
+                                                title="View ${bid.bidder.name}'s profile">
+                                                ${bid.bidder.name}
+                                            </a>
+                                        ` : bid.bidder.name}
+                                    </dd>
                                     
                                     <dt>Company</dt>
                                     <dd>${bid.bidder.company || 'N/A'}</dd>
@@ -161,6 +170,15 @@
                                         <dd>${bid.bidder.phone}</dd>
                                     ` : ''}
                                 </dl>
+                                ${isManager ? `
+                                    <div class="mt-3">
+                                        <a href="#/users/${bid.bidder.id}" 
+                                        class="btn btn-sm btn-outline-primary"
+                                        onclick="BidDetailModal.closeModal(); Router.navigate('/users/${bid.bidder.id}'); return false;">
+                                            <i class="fas fa-user"></i> View Full Profile
+                                        </a>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>

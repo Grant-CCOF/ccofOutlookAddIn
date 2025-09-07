@@ -140,7 +140,7 @@ const ProjectModals = {
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>Delivery Date <span class="text-danger">*</span></label>
-                            <input type="date" 
+                            <input type="datetime-local" 
                                 class="form-control" 
                                 name="delivery_date" 
                                 id="deliveryDate"
@@ -214,15 +214,29 @@ const ProjectModals = {
                             <input type="checkbox" 
                                 class="custom-control-input" 
                                 id="startBidding"
-                                name="start_bidding">
+                                name="start_bidding"
+                                onchange="ProjectModals.toggleBiddingWarning(this)">
                             <label class="custom-control-label" for="startBidding">
                                 Immediately open for bidding after creation
                             </label>
+                        </div>
+                        <div id="biddingWarning" class="alert alert-warning mt-2" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            <strong>Important:</strong> Once bidding starts, you will not be able to edit the project details, 
+                            including title, description, bid parameters, or dates. Make sure all information is correct before 
+                            enabling this option.
                         </div>
                     </div>
                 ` : ''}
             </form>
         `;
+    },
+
+    toggleBiddingWarning(checkbox) {
+        const warningDiv = document.getElementById('biddingWarning');
+        if (warningDiv) {
+            warningDiv.style.display = checkbox.checked ? 'block' : 'none';
+        }
     },
 
     // Render existing files for editing
@@ -509,7 +523,25 @@ const ProjectModals = {
             }
             
         } catch (error) {
-            App.showError('Failed to update project');
+            console.error('Edit project error:', error);
+            
+            // Show the actual error message from the server
+            let errorMessage = 'Failed to update project';
+            
+            if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            // Check for specific validation errors
+            if (error.message && error.message.includes('Cannot modify bid parameters')) {
+                errorMessage = 'Cannot modify bid parameters after bidding starts. Only draft projects can have their bid settings changed.';
+            } else if (error.message && error.message.includes('Access denied')) {
+                errorMessage = 'You do not have permission to edit this project.';
+            } else if (error.message && error.message.includes('not found')) {
+                errorMessage = 'Project not found. It may have been deleted.';
+            }
+            
+            App.showError(errorMessage);
         } finally {
             App.showLoading(false);
         }
@@ -565,9 +597,22 @@ const ProjectModals = {
             data.site_conditions = conditions;
         }
         
-        // Remove empty max_bid
-        if (!data.max_bid) {
-            delete data.max_bid;
+        // Convert max_bid to number or null (don't delete it)
+        if (data.max_bid) {
+            data.max_bid = parseFloat(data.max_bid);
+        } else {
+            data.max_bid = null;  // Send null instead of deleting
+        }
+        
+        // Ensure dates are properly formatted
+        if (data.bid_due_date) {
+            // Add timezone and ensure ISO format
+            data.bid_due_date = new Date(data.bid_due_date).toISOString();
+        }
+        
+        if (data.delivery_date) {
+            // For date-only field, ensure proper format
+            data.delivery_date = new Date(data.delivery_date).toISOString();
         }
         
         // Remove fields that don't exist in the database

@@ -266,11 +266,11 @@ const ProjectsComponent = {
                         </div>
                         <div class="project-stat">
                             <span class="project-stat-label">Bid Due</span>
-                            <span class="project-stat-value">${Formatter.date(project.bid_due_date)}</span>
+                            <span class="project-stat-value">${Formatter.datetime(project.bid_due_date)}</span>
                         </div>
                         <div class="project-stat">
                             <span class="project-stat-label">Delivery</span>
-                            <span class="project-stat-value">${Formatter.date(project.delivery_date)}</span>
+                            <span class="project-stat-value">${Formatter.datetime(project.delivery_date)}</span>
                         </div>
                         <div class="project-stat">
                             <span class="project-stat-label">Bids</span>
@@ -291,7 +291,7 @@ const ProjectsComponent = {
                     </div>
                     
                     <div class="project-card-actions">
-                        ${isManager ? `
+                        ${isManager && project.status === 'draft' ? `
                             <button class="btn btn-sm btn-outline" 
                                     onclick="ProjectsComponent.editProject(${project.id})">
                                 <i class="fas fa-edit"></i> Edit
@@ -481,7 +481,7 @@ const ProjectsComponent = {
                                         <i class="fas fa-user"></i> ${project.project_manager_name}
                                     </span>
                                     <span class="text-muted ml-3">
-                                        <i class="fas fa-calendar"></i> Created ${Formatter.date(project.created_at)}
+                                        <i class="fas fa-calendar"></i> Created ${Formatter.datetime(project.created_at)}
                                     </span>
                                 </div>
                             </div>
@@ -598,12 +598,24 @@ const ProjectsComponent = {
             `);
         }
         
-        if (isAdmin || (isManager && ['draft', 'bidding'].includes(project.status))) {
-            actions.push(`
-                <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
-            `);
+        if (isAdmin || isManager) {
+            if (project.status === 'draft') {
+                actions.push(`
+                    <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                `);
+            } else {
+                // Show disabled edit button with tooltip for non-draft projects
+                actions.push(`
+                    <button class="btn btn-outline" 
+                            disabled 
+                            title="Projects cannot be edited after bidding has started. Only draft projects can be edited."
+                            style="cursor: not-allowed; opacity: 0.6;">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                `);
+            }
         }
 
         if (isAdmin || (isManager && ['draft', 'bidding', 'reviewing'].includes(project.status))) {
@@ -663,10 +675,10 @@ const ProjectsComponent = {
                             <dd>${project.zip_code}</dd>
                             
                             <dt>Bid Due Date</dt>
-                            <dd>${Formatter.date(project.bid_due_date)}</dd>
+                            <dd>${Formatter.datetime(project.bid_due_date)}</dd>
                             
                             <dt>Delivery Date</dt>
-                            <dd>${Formatter.date(project.delivery_date)}</dd>
+                            <dd>${Formatter.datetime(project.delivery_date)}</dd>
                             
                             ${project.show_max_bid && project.max_bid ? `
                                 <dt>Maximum Bid</dt>
@@ -742,11 +754,23 @@ const ProjectsComponent = {
         const canAward = isManager && project.status === 'reviewing' && bid.status === 'pending';
         const canWithdraw = isBidder && bid.status === 'pending';
         
+        // Only project managers and admins can click to view bidder profiles
+        const canViewProfile = user.role === 'admin' || user.role === 'project_manager';
+        
         return `
             <tr class="bid-row" data-bid-id="${bid.id}">
                 <td>
                     <div class="bidder-info">
-                        <strong>${bid.user_name}</strong>
+                        ${canViewProfile ? `
+                            <a href="#/users/${bid.user_id}" 
+                            class="bidder-link" 
+                            onclick="event.stopPropagation(); Router.navigate('/users/${bid.user_id}');"
+                            title="View ${bid.user_name}'s profile">
+                                <strong>${bid.user_name}</strong>
+                            </a>
+                        ` : `
+                            <strong>${bid.user_name}</strong>
+                        `}
                         ${bid.position ? `<br><small class="text-muted">${bid.position}</small>` : ''}
                     </div>
                 </td>
@@ -761,48 +785,88 @@ const ProjectsComponent = {
                     ` : ''}
                 </td>
                 <td>
-                    ${Formatter.date(bid.alternate_delivery_date || project.delivery_date)}
+                    ${Formatter.datetime(bid.alternate_delivery_date || project.delivery_date)}
                     ${bid.alternate_delivery_time ? `<br><small>${bid.alternate_delivery_time}</small>` : ''}
                 </td>
                 <td>
                     <div class="rating-display">
                         ${bid.average_rating ? `
-                            ${this.getRatingStars(bid.average_rating)}
-                            <small>(${bid.rating_count || 0})</small>
-                        ` : '<small class="text-muted">No ratings</small>'}
+                            <span class="badge badge-light">
+                                <i class="fas fa-star text-warning"></i> 
+                                ${parseFloat(bid.average_rating).toFixed(1)}
+                            </span>
+                        ` : `
+                            <span class="text-muted">-</span>
+                        `}
                     </div>
                 </td>
                 <td>
-                    <small>${Formatter.timeAgo(bid.created_at)}</small>
+                    ${Formatter.datetime(bid.created_at)}
                 </td>
                 <td>
-                    <span class="badge badge-${this.getBidStatusClass(bid.status)}">
+                    <span class="badge badge-${this.getStatusColor(bid.status)}">
                         ${bid.status}
                     </span>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" 
-                            onclick="BidDetailModal.showBidDetail(${bid.id}, { showAwardButton: ${canAward} })"
-                            title="View full bid details">
-                        <i class="fas fa-eye"></i> View
-                    </button>
                     ${canAward ? `
-                        <button class="btn btn-sm btn-success ml-1" 
-                                onclick="ProjectsComponent.acceptBid(${project.id}, ${bid.id})"
-                                title="Quick award">
-                            <i class="fas fa-check"></i> Award
+                        <button class="btn btn-sm btn-success" 
+                                onclick="event.stopPropagation(); ProjectsComponent.awardProject(${project.id}, ${bid.id})"
+                                title="Award project to this bidder">
+                            <i class="fas fa-trophy"></i>
                         </button>
                     ` : ''}
                     ${canWithdraw ? `
-                        <button class="btn btn-sm btn-danger ml-1" 
-                                onclick="ProjectsComponent.withdrawBidFromProject(${bid.id}, ${project.id})"
-                                title="Withdraw bid">
-                            <i class="fas fa-times"></i> Withdraw
+                        <button class="btn btn-sm btn-danger" 
+                                onclick="event.stopPropagation(); ProjectsComponent.withdrawBid(${bid.id})"
+                                title="Withdraw this bid">
+                            <i class="fas fa-times"></i>
                         </button>
                     ` : ''}
+                    <button class="btn btn-sm btn-info" 
+                            onclick="event.stopPropagation(); BidsComponent.viewBidDetails(${bid.id})"
+                            title="View bid details">
+                        <i class="fas fa-eye"></i>
+                    </button>
                 </td>
             </tr>
         `;
+    },
+
+    // Helper function to get status color for badges
+    getStatusColor(status) {
+        const colors = {
+            // Bid statuses
+            'pending': 'warning',     // Yellow/Orange - waiting for decision
+            'won': 'success',         // Green - bid was accepted
+            'lost': 'danger',         // Red - bid was not selected
+            'withdrawn': 'secondary', // Gray - bid was withdrawn
+            'active': 'primary',      // Blue - actively being considered
+            'expired': 'dark',        // Dark gray - bid expired
+            
+            // Project statuses (if needed)
+            'draft': 'secondary',
+            'bidding': 'primary',
+            'reviewing': 'info',
+            'awarded': 'success',
+            'completed': 'success',
+            'cancelled': 'danger'
+        };
+        
+        return colors[status.toLowerCase()] || 'secondary';
+    },
+
+    navigateToUserProfile(userId, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        const user = State.getUser();
+        // Only allow navigation for project managers and admins
+        if (user.role === 'admin' || user.role === 'project_manager') {
+            Router.navigate(`/users/${userId}`);
+        }
     },
 
     // Withdraw bid from project view

@@ -113,7 +113,7 @@ router.post('/', [
     body('zip_code').matches(/^\d{5}(-\d{4})?$/).withMessage('Valid ZIP code required'),
     body('delivery_date').isISO8601().withMessage('Valid delivery date required'),
     body('bid_due_date').isISO8601().withMessage('Valid bid due date required'),
-    body('max_bid').optional().isFloat({ min: 0 }).withMessage('Max bid must be positive'),
+    body('max_bid').optional({ nullable: true, checkFalsy: true }).isFloat({ min: 0 }).withMessage('Max bid must be positive'),
     body('show_max_bid').optional().isBoolean(),
     body('site_conditions').optional().isArray(),
     handleValidationErrors

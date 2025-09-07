@@ -112,7 +112,7 @@ const BidModals = {
                 
                 <div class="form-group">
                     <label>Alternate Delivery Date</label>
-                    <input type="date" 
+                    <input type="datetime-local" 
                            class="form-control" 
                            name="alternate_delivery_date"
                            value="${bid?.alternate_delivery_date?.split('T')[0] || ''}"

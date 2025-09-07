@@ -446,9 +446,26 @@ router.get('/:id/stats', [
 });
 
 // Additional endpoint to check if user can view ratings
-router.get('/can-view-ratings', authenticateToken, (req, res) => {
-    const canViewRatings = req.user.role === 'admin' || req.user.role === 'project_manager';
-    res.json({ canViewRatings });
+router.get('/:id/can-view-ratings', authenticateToken, async (req, res) => {
+    try {
+        const targetUserId = parseInt(req.params.id);
+        const requestingUser = req.user;
+        
+        // Check if the requesting user can view ratings
+        const canViewRatings = requestingUser.role === 'admin' || requestingUser.role === 'project_manager';
+        
+        // Check if the target user can have ratings (is an installer)
+        const targetUser = await UserModel.getById(targetUserId);
+        const canHaveRatings = targetUser && (targetUser.role === 'installation_company' || targetUser.role === 'operations');
+        
+        res.json({ 
+            canViewRatings: canViewRatings && canHaveRatings,
+            reason: !canViewRatings ? 'insufficient_permissions' : !canHaveRatings ? 'user_not_ratable' : 'allowed'
+        });
+    } catch (error) {
+        logger.error('Error checking rating permissions:', error);
+        res.status(500).json({ error: 'Failed to check permissions' });
+    }
 });
 
 module.exports = router;
