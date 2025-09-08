@@ -701,6 +701,11 @@ const ProjectsComponent = {
                             </div>
                         </div>
                     ` : ''}
+
+                    <!-- Display tri-state checkbox options -->
+                    ${TriStateCheckbox.displayOptions('scope', project.scope_options)}
+                    ${TriStateCheckbox.displayOptions('site_info', project.site_info_options)}
+                    ${TriStateCheckbox.displayOptions('requirements', project.requirements_options)}
                 </div>
                 
                 <div class="col-md-4">

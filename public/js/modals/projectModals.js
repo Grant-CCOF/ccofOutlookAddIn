@@ -145,6 +145,14 @@ const ProjectModals = {
                             rows="3"
                             placeholder="Specify any special product care requirements...">${project?.product_care_info || ''}</textarea>
                 </div>
+
+                <div class="tri-state-sections mt-4">
+                    <h4 class="mb-3">Project Options</h4>
+                    
+                    ${TriStateCheckbox.renderCategory('scope', project?.scope_options || {})}
+                    ${TriStateCheckbox.renderCategory('site_info', project?.site_info_options || {})}
+                    ${TriStateCheckbox.renderCategory('requirements', project?.requirements_options || {})}
+                </div>
                 
                 <div class="form-group">
                     <label>ZIP Code <span class="text-danger">*</span></label>
@@ -317,6 +325,15 @@ const ProjectModals = {
         
         // Initialize file upload
         this.initializeFileUpload(formId, project?.files);
+
+        // Make sure tri-state checkboxes are properly initialized
+        // Categories start expanded
+        ['scope', 'site_info', 'requirements'].forEach(category => {
+            const options = document.getElementById(`${category}_options`);
+            if (options) {
+                options.style.display = 'block';
+            }
+        });
     },
 
     // Initialize file upload for project form
@@ -646,6 +663,11 @@ const ProjectModals = {
             // For date-only field, ensure proper format
             data.delivery_date = new Date(data.delivery_date).toISOString();
         }
+
+        // Process tri-state checkboxes
+        data.scope_options = TriStateCheckbox.parseFormValues(formData, 'scope');
+        data.site_info_options = TriStateCheckbox.parseFormValues(formData, 'site_info');
+        data.requirements_options = TriStateCheckbox.parseFormValues(formData, 'requirements');
         
         // Remove fields that don't exist in the database
         delete data.budget_range;

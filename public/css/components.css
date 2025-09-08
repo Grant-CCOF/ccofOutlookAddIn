@@ -1140,3 +1140,136 @@
     display: block;
     margin-top: 2px;
 }
+
+/* Tri-State Checkbox Styles */
+.tri-state-category {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.category-title {
+    margin-bottom: 15px;
+    color: #495057;
+    cursor: pointer;
+    user-select: none;
+}
+
+.category-toggle {
+    margin-right: 10px;
+    transition: transform 0.2s;
+}
+
+.tri-state-checkbox-item {
+    margin-bottom: 10px;
+}
+
+.tri-state-control {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.tri-state-control:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.tri-state-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    font-size: 14px;
+}
+
+.tri-state-icon.state-check {
+    color: #28a745;
+}
+
+.tri-state-icon.state-x {
+    color: #6c757d;
+}
+
+.tri-state-icon.state-blank {
+    color: #dee2e6;
+}
+
+.tri-state-label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Option Badges for Display */
+.option-display-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.option-display-section h5 {
+    margin-bottom: 15px;
+    color: #495057;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.option-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.option-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.option-badge i {
+    margin-right: 5px;
+    font-size: 12px;
+}
+
+.badge-check {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.badge-x {
+    background: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tri-state-category {
+        padding: 10px;
+    }
+    
+    .option-badges {
+        gap: 5px;
+    }
+    
+    .option-badge {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+}

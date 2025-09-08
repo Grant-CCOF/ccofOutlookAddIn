@@ -8,8 +8,9 @@ class ProjectModel {
                 title, description, status, project_manager_id, zip_code,
                 delivery_date, delivery_time, bid_due_date, max_bid, show_max_bid,
                 site_conditions, custom_fields, pecial_instructions, training_requirements,
-                access_control_info, product_care_info
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                access_control_info, product_care_info,
+                scope_options, site_info_options, requirements_options
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
@@ -28,7 +29,10 @@ class ProjectModel {
             projectData.special_instructions || null,
             projectData.training_requirements || null,
             projectData.access_control_info || null,
-            projectData.product_care_info || null
+            projectData.product_care_info || null,
+            JSON.stringify(projectData.scope_options || {}),
+            JSON.stringify(projectData.site_info_options || {}),
+            JSON.stringify(projectData.requirements_options || {})
         ];
         
         try {
@@ -64,6 +68,16 @@ class ProjectModel {
             }
             if (project.custom_fields) {
                 project.custom_fields = JSON.parse(project.custom_fields);
+            }
+
+            if (project.scope_options) {
+            project.scope_options = JSON.parse(project.scope_options);
+            }
+            if (project.site_info_options) {
+                project.site_info_options = JSON.parse(project.site_info_options);
+            }
+            if (project.requirements_options) {
+                project.requirements_options = JSON.parse(project.requirements_options);
             }
             
             // Format the submitter display name
