@@ -1,6 +1,7 @@
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { ClientSecretCredential } = require('@azure/identity');
 const logger = require('../utils/logger');
+const db = require('../models/database');
 
 class MicrosoftEmailService {
     constructor() {
@@ -249,6 +250,485 @@ class MicrosoftEmailService {
         `;
         
         return await this.sendEmail(user.email, subject, html);
+    }
+
+    async sendProjectCreationEmail(project, creator) {
+        try {
+            // Get all admin emails
+            const admins = await db.all(
+                'SELECT email, name FROM users WHERE role = ? AND approved = 1',
+                ['admin']
+            );
+            
+            const results = [];
+            for (const admin of admins) {
+                const subject = `New Project Created: ${project.title}`;
+                const html = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body { 
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                line-height: 1.6;
+                                color: #1d1d1f;
+                                background: #f5f5f7;
+                            }
+                            .container { 
+                                max-width: 600px; 
+                                margin: 40px auto; 
+                                background: white;
+                                border-radius: 12px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                            }
+                            .header { 
+                                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                                color: white; 
+                                padding: 30px; 
+                                text-align: center;
+                                border-radius: 12px 12px 0 0;
+                            }
+                            .content { 
+                                padding: 30px;
+                            }
+                            .info-box {
+                                background: #f8f9fa;
+                                padding: 20px;
+                                border-radius: 8px;
+                                margin: 20px 0;
+                            }
+                            .button { 
+                                display: inline-block;
+                                background: #007bff; 
+                                color: white; 
+                                padding: 12px 30px; 
+                                text-decoration: none; 
+                                border-radius: 25px;
+                                font-weight: 500;
+                                margin: 20px 0;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>New Project Created</h1>
+                                <p>A new project has been added to the platform</p>
+                            </div>
+                            <div class="content">
+                                <h2>${project.title}</h2>
+                                
+                                <div class="info-box">
+                                    <p><strong>Created by:</strong> ${creator.name || creator.username}</p>
+                                    <p><strong>Delivery Date:</strong> ${new Date(project.delivery_date).toLocaleDateString()}</p>
+                                    <p><strong>Location:</strong> ${project.zip_code}</p>
+                                    <p><strong>Max Budget:</strong> $${project.max_bid}</p>
+                                    <p><strong>Bid Due Date:</strong> ${new Date(project.bid_due_date).toLocaleDateString()}</p>
+                                </div>
+                                
+                                <p><strong>Description:</strong></p>
+                                <p>${project.description}</p>
+                                
+                                <center>
+                                    <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                        View Project Details
+                                    </a>
+                                </center>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+                
+                const result = await this.sendEmail(admin.email, subject, html);
+                results.push(result);
+            }
+            
+            return { success: true, results };
+        } catch (error) {
+            logger.error('Error sending project creation emails:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async sendProjectCompletionEmail(project, winner) {
+        try {
+            const admins = await db.all(
+                'SELECT email, name FROM users WHERE role = ? AND approved = 1',
+                ['admin']
+            );
+            
+            // Get project statistics
+            const stats = await db.get(
+                `SELECT COUNT(*) as total_bids, 
+                        MIN(amount) as min_bid, 
+                        MAX(amount) as max_bid,
+                        AVG(amount) as avg_bid
+                FROM bids WHERE project_id = ?`,
+                [project.id]
+            );
+            
+            const results = [];
+            for (const admin of admins) {
+                const subject = `Project Completed: ${project.title}`;
+                const html = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            /* Same styles as above */
+                            .success-header {
+                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                            }
+                            .stats-grid {
+                                display: grid;
+                                grid-template-columns: repeat(2, 1fr);
+                                gap: 15px;
+                                margin: 20px 0;
+                            }
+                            .stat-box {
+                                background: #f8f9fa;
+                                padding: 15px;
+                                border-radius: 8px;
+                                text-align: center;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header success-header">
+                                <h1>✓ Project Completed</h1>
+                                <p>Project has been successfully completed</p>
+                            </div>
+                            <div class="content">
+                                <h2>${project.title}</h2>
+                                
+                                <div class="info-box">
+                                    <p><strong>Winner:</strong> ${winner.name || winner.company}</p>
+                                    <p><strong>Winning Bid:</strong> $${project.awarded_amount}</p>
+                                    <p><strong>Completion Date:</strong> ${new Date().toLocaleDateString()}</p>
+                                </div>
+                                
+                                <div class="stats-grid">
+                                    <div class="stat-box">
+                                        <h3>${stats.total_bids}</h3>
+                                        <p>Total Bids</p>
+                                    </div>
+                                    <div class="stat-box">
+                                        <h3>$${Math.round(stats.avg_bid)}</h3>
+                                        <p>Average Bid</p>
+                                    </div>
+                                </div>
+                                
+                                <center>
+                                    <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                        View Project Summary
+                                    </a>
+                                </center>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+                
+                const result = await this.sendEmail(admin.email, subject, html);
+                results.push(result);
+            }
+            
+            return { success: true, results };
+        } catch (error) {
+            logger.error('Error sending completion emails:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async sendBidClosingEmail(project, stats) {
+        try {
+            // Get project manager details
+            const pm = await db.get(
+                'SELECT email, name FROM users WHERE id = ?',
+                [project.project_manager_id]
+            );
+            
+            const subject = `Bidding Closed: ${project.title} - ${stats.total_bids} Bids Received`;
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        /* Previous styles */
+                        .bid-summary {
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 30px;
+                            border-radius: 12px;
+                            text-align: center;
+                            margin: 20px 0;
+                        }
+                        .bid-count {
+                            font-size: 48px;
+                            font-weight: bold;
+                            margin: 10px 0;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>Bidding Period Closed</h1>
+                            <p>The bidding period for your project has ended</p>
+                        </div>
+                        <div class="content">
+                            <h2>${project.title}</h2>
+                            
+                            <div class="bid-summary">
+                                <div class="bid-count">${stats.total_bids}</div>
+                                <p>Total Bids Received</p>
+                            </div>
+                            
+                            ${stats.total_bids > 0 ? `
+                            <div class="info-box">
+                                <h3>Bid Statistics</h3>
+                                <p><strong>Lowest Bid:</strong> $${stats.min_bid}</p>
+                                <p><strong>Highest Bid:</strong> $${stats.max_bid}</p>
+                                <p><strong>Average Bid:</strong> $${Math.round(stats.avg_bid)}</p>
+                            </div>
+                            ` : '<p>No bids were received for this project.</p>'}
+                            
+                            <center>
+                                <a href="${process.env.APP_URL}/projects/${project.id}/bids" class="button">
+                                    Review All Bids
+                                </a>
+                            </center>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            return await this.sendEmail(pm.email, subject, html);
+        } catch (error) {
+            logger.error('Error sending bid closing email:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async sendBidSubmissionEmail(project, bid, bidder) {
+        try {
+            const pm = await db.get(
+                'SELECT email, name FROM users WHERE id = ?',
+                [project.project_manager_id]
+            );
+            
+            // Get current bid count
+            const bidCount = await db.get(
+                'SELECT COUNT(*) as count FROM bids WHERE project_id = ?',
+                [project.id]
+            );
+            
+            const subject = `New Bid Received: ${project.title}`;
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>
+                        /* Previous styles */
+                        .bidder-card {
+                            border: 2px solid #007bff;
+                            border-radius: 12px;
+                            padding: 20px;
+                            margin: 20px 0;
+                        }
+                        .bidder-header {
+                            display: flex;
+                            align-items: center;
+                            margin-bottom: 15px;
+                        }
+                        .bidder-avatar {
+                            width: 60px;
+                            height: 60px;
+                            border-radius: 50%;
+                            background: #007bff;
+                            color: white;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 24px;
+                            font-weight: bold;
+                            margin-right: 15px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>New Bid Received</h1>
+                            <p>Bid #${bidCount.count} for your project</p>
+                        </div>
+                        <div class="content">
+                            <h2>${project.title}</h2>
+                            
+                            <div class="bidder-card">
+                                <div class="bidder-header">
+                                    <div class="bidder-avatar">
+                                        ${(bidder.name || bidder.company || 'B')[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h3>${bidder.name || bidder.company}</h3>
+                                        <p>${bidder.position || 'Installation Company'}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="info-box">
+                                    <p><strong>Bid Amount:</strong> $${bid.amount}</p>
+                                    <p><strong>Delivery:</strong> ${bid.alternate_delivery_date ? 
+                                        new Date(bid.alternate_delivery_date).toLocaleDateString() : 
+                                        'As per project schedule'}</p>
+                                    ${bid.comments ? `<p><strong>Comments:</strong> ${bid.comments}</p>` : ''}
+                                </div>
+                            </div>
+                            
+                            <center>
+                                <a href="${process.env.APP_URL}/projects/${project.id}/bids" class="button">
+                                    View All Bids
+                                </a>
+                            </center>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            return await this.sendEmail(pm.email, subject, html);
+        } catch (error) {
+            logger.error('Error sending bid submission email:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async sendBidAwardEmails(project, winningBid, allBids) {
+        try {
+            const results = [];
+            
+            for (const bid of allBids) {
+                const bidder = await db.get(
+                    'SELECT email, name, company FROM users WHERE id = ?',
+                    [bid.user_id]
+                );
+                
+                const isWinner = bid.id === winningBid.id;
+                const subject = isWinner ? 
+                    `🎉 Congratulations! You Won: ${project.title}` : 
+                    `Bid Update: ${project.title}`;
+                
+                const html = isWinner ? 
+                    this.getWinnerEmailHtml(project, bid, bidder) : 
+                    this.getLoserEmailHtml(project, winningBid, bidder);
+                
+                const result = await this.sendEmail(bidder.email, subject, html);
+                results.push(result);
+            }
+            
+            return { success: true, results };
+        } catch (error) {
+            logger.error('Error sending award emails:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    getWinnerEmailHtml(project, bid, bidder) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    /* Previous styles */
+                    .winner-header {
+                        background: linear-gradient(135deg, #00c851 0%, #00ff88 100%);
+                        color: white;
+                    }
+                    .trophy {
+                        font-size: 72px;
+                        text-align: center;
+                        margin: 20px 0;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header winner-header">
+                        <h1>🎉 Congratulations!</h1>
+                        <p>Your bid has been selected</p>
+                    </div>
+                    <div class="content">
+                        <div class="trophy">🏆</div>
+                        
+                        <h2>${project.title}</h2>
+                        
+                        <div class="info-box" style="background: #d4edda; border: 2px solid #28a745;">
+                            <h3>Winning Details</h3>
+                            <p><strong>Your Bid:</strong> $${bid.amount}</p>
+                            <p><strong>Delivery Date:</strong> ${new Date(project.delivery_date).toLocaleDateString()}</p>
+                            <p><strong>Location:</strong> ${project.zip_code}</p>
+                        </div>
+                        
+                        <h3>Next Steps:</h3>
+                        <ol>
+                            <li>You will be contacted by the project manager within 24 hours</li>
+                            <li>Review and confirm project requirements</li>
+                            <li>Coordinate delivery and installation details</li>
+                            <li>Begin work as per the agreed timeline</li>
+                        </ol>
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                View Project Details
+                            </a>
+                        </center>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    getLoserEmailHtml(project, winningBid, bidder) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    /* Previous styles */
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Bid Update</h1>
+                        <p>Project has been awarded</p>
+                    </div>
+                    <div class="content">
+                        <h2>${project.title}</h2>
+                        
+                        <p>Thank you for submitting your bid for this project. After careful consideration, we have selected another vendor for this project.</p>
+                        
+                        <div class="info-box">
+                            <p><strong>Winning Bid:</strong> $${winningBid.amount}</p>
+                            <p><strong>Your Bid:</strong> Check your dashboard for details</p>
+                        </div>
+                        
+                        <p>We appreciate your participation and encourage you to bid on future projects. Your competitive bids help ensure the best value for our clients.</p>
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/projects" class="button">
+                                View Other Projects
+                            </a>
+                        </center>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
     }
 }
 

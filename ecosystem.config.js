@@ -14,7 +14,7 @@ module.exports = {
       log_file: './logs/pm2-combined.log',
       time: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '1.8G',
       min_uptime: '10s',
       max_restarts: 10,
       autorestart: true,

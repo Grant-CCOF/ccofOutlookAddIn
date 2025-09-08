@@ -98,7 +98,7 @@ router.post('/create', [
         // Send welcome email if approved
         if (approved) {
             try {
-                await emailService.sendWelcomeEmail(user);
+                //await emailService.sendWelcomeEmail(user);
             } catch (emailError) {
                 logger.warn(`Failed to send welcome email to ${email}:`, emailError);
                 // Don't fail the user creation if email fails
@@ -220,7 +220,7 @@ router.post('/:id/approve', [
         await UserModel.update(req.params.id, { approved: 1 });
         
         // Send approval email
-        await emailService.sendApprovalEmail(user);
+        //await emailService.sendApprovalEmail(user);
         
         logger.info(`User approved: ${user.username} by admin ${req.user.username}`);
         

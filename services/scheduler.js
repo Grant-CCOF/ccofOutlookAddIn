@@ -3,6 +3,7 @@ const db = require('../models/database');
 const ProjectModel = require('../models/project');
 const logger = require('../utils/logger');
 const NotificationService = require('./notificationService');
+const emailService = require('../services/microsoftEmailService');
 
 class SchedulerService {
     constructor() {
@@ -95,6 +96,19 @@ class SchedulerService {
             
             // Send notifications
             await this.sendClosureNotifications(project);
+
+            // Get bid statistics
+            const stats = await db.get(
+                `SELECT COUNT(*) as total_bids,
+                        MIN(amount) as min_bid,
+                        MAX(amount) as max_bid,
+                        AVG(amount) as avg_bid
+                FROM bids WHERE project_id = ?`,
+                [project.id]
+            );
+            
+            // Send email to project owner
+            await emailService.sendBidClosingEmail(project, stats);
             
             // Log the automatic closure
             this.logAutoClosure(project);

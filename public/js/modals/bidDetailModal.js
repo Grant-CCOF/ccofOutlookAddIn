@@ -184,7 +184,8 @@
                     </div>
                     
                     <!-- Ratings Section -->
-                    ${bid.ratings && bid.ratings.count > 0 ? `
+                    ${bid.ratings && bid.ratings.count > 0 && !isBidder ?
+                    `
                         <div class="detail-section mt-4">
                             <h5>Bidder Ratings</h5>
                             <div class="rating-overview">
@@ -210,12 +211,12 @@
                                 </div>
                             </div>
                         </div>
-                    ` : `
+                    ` : !isBidder && bid.ratings ? `
                         <div class="detail-section mt-4">
                             <h5>Bidder Ratings</h5>
                             <p class="text-muted">No ratings available for this bidder yet.</p>
                         </div>
-                    `}
+                    ` : ''}
                     
                     <!-- Comments Section -->
                     ${bid.comments ? `

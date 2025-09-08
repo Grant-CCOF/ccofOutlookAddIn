@@ -90,10 +90,6 @@ const ProfileComponent = {
                                         onclick="ProfileComponent.showChangePasswordModal()">
                                     <i class="fas fa-key"></i> Change Password
                                 </button>
-                                <button class="btn btn-outline btn-block mb-2" 
-                                        onclick="ProfileComponent.showNotificationSettings()">
-                                    <i class="fas fa-bell"></i> Notification Settings
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -845,12 +841,6 @@ const ProfileComponent = {
         }
         
         document.body.classList.remove('modal-open');
-    },
-    
-    // Show notification settings
-    showNotificationSettings() {
-        // Implementation for notification settings
-        App.showToast('Info', 'Notification settings coming soon', 'info');
     },
     
     // Download user data

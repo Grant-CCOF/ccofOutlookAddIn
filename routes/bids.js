@@ -6,10 +6,11 @@ const ProjectModel = require('../models/project');
 const FileModel = require('../models/file');
 const UserModel = require('../models/user');
 const NotificationService = require('../services/notificationService');
-const emailService = require('../services/emailService');
+const emailService = require('../services/microsoftEmailService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const logger = require('../utils/logger');
+const db = require('../models/database');
 
 // Get all bids (admin only)
 router.get('/', [
@@ -256,6 +257,13 @@ router.post('/', [
         
         const bidId = await BidModel.create(bidData);
         const newBid = await BidModel.getById(bidId);
+
+        // Send email notification
+        const bidder = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        const bid = await BidModel.getById(bidId);
+        
+        emailService.sendBidSubmissionEmail(project, bid, bidder)
+            .catch(error => logger.error('Email error:', error));
         
         // Notify project manager
         await NotificationService.notifyUser(

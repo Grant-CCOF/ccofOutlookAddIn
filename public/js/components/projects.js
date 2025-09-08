@@ -665,6 +665,42 @@ const ProjectsComponent = {
                             ${project.site_conditions.map(condition => `<li>${condition}</li>`).join('')}
                         </ul>
                     ` : ''}
+
+                    ${project.special_instructions ? `
+                        <div class="mt-4">
+                            <h4>Special Instructions</h4>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> ${project.special_instructions}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${project.training_requirements ? `
+                        <div class="mt-4">
+                            <h4>Training Requirements</h4>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-graduation-cap"></i> ${project.training_requirements}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${project.access_control_info ? `
+                        <div class="mt-4">
+                            <h4>Access Control Information</h4>
+                            <div class="alert alert-secondary">
+                                <i class="fas fa-lock"></i> ${project.access_control_info}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${project.product_care_info ? `
+                        <div class="mt-4">
+                            <h4>Special Product Care Information</h4>
+                            <div class="alert alert-primary">
+                                <i class="fas fa-hand-holding-heart"></i> ${project.product_care_info}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
                 
                 <div class="col-md-4">

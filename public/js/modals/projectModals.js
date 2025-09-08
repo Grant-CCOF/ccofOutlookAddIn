@@ -113,6 +113,38 @@ const ProjectModals = {
                             rows="4"
                             required>${project?.description || ''}</textarea>
                 </div>
+
+                <div class="form-group">
+                <label>Special Instructions</label>
+                    <textarea class="form-control" 
+                            name="special_instructions" 
+                            rows="3"
+                            placeholder="Enter any special instructions for this project...">${project?.special_instructions || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Training Requirements</label>
+                    <textarea class="form-control" 
+                            name="training_requirements" 
+                            rows="3"
+                            placeholder="Specify any training requirements...">${project?.training_requirements || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Access Control Information</label>
+                    <textarea class="form-control" 
+                            name="access_control_info" 
+                            rows="3"
+                            placeholder="Enter access control or security information...">${project?.access_control_info || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Special Product Care Information</label>
+                    <textarea class="form-control" 
+                            name="product_care_info" 
+                            rows="3"
+                            placeholder="Specify any special product care requirements...">${project?.product_care_info || ''}</textarea>
+                </div>
                 
                 <div class="form-group">
                     <label>ZIP Code <span class="text-danger">*</span></label>

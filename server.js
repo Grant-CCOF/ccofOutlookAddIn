@@ -101,6 +101,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// IMPORTANT: Enable trust proxy for accurate IP detection behind nginx/proxies
+app.set('trust proxy', true);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -112,13 +115,77 @@ if (process.env.NODE_ENV === 'production') {
     app.use(morgan('dev'));
 }
 
+// Custom key generator for better IP extraction
+const getClientIp = (req) => {
+    // Priority order for IP extraction
+    return req.headers['x-real-ip'] ||              // nginx real IP
+           req.headers['x-forwarded-for']?.split(',')[0] || // proxy forwarded IP
+           req.connection.remoteAddress ||          // direct connection
+           req.socket.remoteAddress ||              // socket connection
+           req.ip;                                   // Express default
+};
+
+// Check if request is from localhost/server itself
+const isLocalRequest = (req) => {
+    const ip = getClientIp(req);
+    const localIPs = [
+        '127.0.0.1',
+        '::1',
+        '::ffff:127.0.0.1',
+        'localhost',
+        process.env.SERVER_IP, // Add your server's public IP if needed
+    ];
+    return localIPs.includes(ip);
+};
+
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
     max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
     message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
+    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+    legacyHeaders: false,  // Disable `X-RateLimit-*` headers
+    
+    // Custom key generator for consistent IP tracking
+    keyGenerator: (req) => {
+        return getClientIp(req);
+    },
+    
+    // Skip rate limiting for certain conditions
+    skip: (req) => {
+        // Skip for local/server requests
+        if (isLocalRequest(req)) {
+            logger.debug(`Skipping rate limit for local request from ${getClientIp(req)}`);
+            return true;
+        }
+        
+        // Skip for whitelisted IPs
+        const whitelist = process.env.RATE_LIMIT_WHITELIST?.split(',') || [];
+        if (whitelist.includes(getClientIp(req))) {
+            logger.debug(`Skipping rate limit for whitelisted IP: ${getClientIp(req)}`);
+            return true;
+        }
+        
+        // Skip for internal service-to-service calls (if using special header)
+        if (req.headers['x-internal-service'] === process.env.INTERNAL_SERVICE_KEY) {
+            return true;
+        }
+        
+        return false;
+    },
+    
+    // Enhanced error handler with logging
+    handler: (req, res) => {
+        const ip = getClientIp(req);
+        logger.warn(`Rate limit exceeded for IP: ${ip}, Path: ${req.path}, User: ${req.user?.id || 'anonymous'}`);
+        
+        res.status(429).json({
+            error: 'Too many requests',
+            message: 'Rate limit exceeded. Please try again later.',
+            ip: process.env.NODE_ENV === 'development' ? ip : undefined, // Show IP in dev mode
+            retryAfter: res.getHeader('Retry-After')
+        });
+    }
 });
 
 app.use('/api', limiter);
@@ -249,7 +316,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Initialize database and start server
+// Track active connections for graceful shutdown
+const connections = new Set();
+
+// Modified startServer function with retry logic
 async function startServer() {
     try {
         await fileService.ensureUploadDirectories();
@@ -263,95 +333,205 @@ async function startServer() {
         const PORT = process.env.PORT || 3000;
         const HOST = '0.0.0.0';
         
-        server.listen(PORT, HOST, () => {
-            logger.info(`Server running on ${HOST}:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-            logger.info(`Application URL: http://localhost:${PORT}`);
-            logger.info(`Socket.IO enabled with ${io.engine.clientsCount || 0} clients`);
-            
-            if (process.env.NODE_ENV !== 'production') {
-                logger.info('Registered API endpoints:');
-                const routes = [];
-                app._router.stack.forEach((middleware) => {
-                    if (middleware.route) {
-                        routes.push({
-                            path: middleware.route.path,
-                            methods: Object.keys(middleware.route.methods).join(', ').toUpperCase()
-                        });
-                    } else if (middleware.name === 'router' && middleware.regexp) {
-                        middleware.handle.stack.forEach((handler) => {
-                            if (handler.route) {
-                                const route = handler.route;
-                                const prefix = middleware.regexp.source.replace(/\\/g, '').replace(/\^|\$/g, '').replace(/\(\?\:\/\)/g, '/').replace(/\(\?\=\/\|\$\)/g, '');
-                                routes.push({
-                                    path: prefix + route.path,
-                                    methods: Object.keys(route.methods).join(', ').toUpperCase()
-                                });
-                            }
-                        });
-                    }
-                });
-                routes.forEach(route => {
-                    logger.info(`  ${route.methods.padEnd(10)} ${route.path}`);
-                });
-            }
+        // Attempt to bind to port with retries
+        const success = await bindToPort(PORT, HOST);
+        
+        if (!success) {
+            logger.error(`Failed to bind to port ${PORT} after multiple attempts`);
+            process.exit(1);
+        }
+        
+        // Track connections for graceful shutdown
+        server.on('connection', (connection) => {
+            connections.add(connection);
+            connection.on('close', () => {
+                connections.delete(connection);
+            });
         });
+        
+        logger.info(`Server running on ${HOST}:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+        logger.info(`Application URL: http://localhost:${PORT}`);
+        logger.info(`Socket.IO enabled with ${io.engine.clientsCount || 0} clients`);
+        
+        // Log registered endpoints in development
+        if (process.env.NODE_ENV !== 'production') {
+            logger.info('Registered API endpoints:');
+            const routes = [];
+            app._router.stack.forEach((middleware) => {
+                if (middleware.route) {
+                    routes.push({
+                        path: middleware.route.path,
+                        methods: Object.keys(middleware.route.methods).join(', ').toUpperCase()
+                    });
+                } else if (middleware.name === 'router' && middleware.regexp) {
+                    middleware.handle.stack.forEach((handler) => {
+                        if (handler.route) {
+                            const route = handler.route;
+                            const prefix = middleware.regexp.source.replace(/\\/g, '').replace(/\^|\$/g, '').replace(/\(\?\:\/\)/g, '/').replace(/\(\?\=\/\|\$\)/g, '');
+                            routes.push({
+                                path: prefix + route.path,
+                                methods: Object.keys(route.methods).join(', ').toUpperCase()
+                            });
+                        }
+                    });
+                }
+            });
+            
+            routes.sort((a, b) => a.path.localeCompare(b.path));
+            routes.forEach(route => {
+                logger.info(`  ${route.methods.padEnd(8)} ${route.path}`);
+            });
+        }
+        
+        // Send startup notification
+        await sendStartupNotification();
+        
     } catch (error) {
         logger.error('Failed to start server:', error);
         process.exit(1);
     }
 }
 
-// Handle graceful shutdown
-process.on('SIGTERM', async () => {
-    logger.info('SIGTERM received, starting graceful shutdown...');
-    server.close(() => logger.info('HTTP server closed'));
-    io.close(() => logger.info('Socket.IO closed'));
-    schedulerService.stop();
-    try {
-        await database.close();
-        logger.info('Database connection closed');
-    } catch (error) {
-        logger.error('Error closing database:', error);
-    }
-    setTimeout(() => {
-        logger.error('Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 10000);
-    process.exit(0);
-});
+// Register shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
 
-process.on('SIGINT', async () => {
-    logger.info('SIGINT received, starting graceful shutdown...');
-    server.close(() => logger.info('HTTP server closed'));
-    io.close(() => logger.info('Socket.IO closed'));
-    schedulerService.stop();
-    try {
-        await database.close();
-        logger.info('Database connection closed');
-    } catch (error) {
-        logger.error('Error closing database:', error);
-    }
-    setTimeout(() => {
-        logger.error('Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 10000);
-    process.exit(0);
-});
-
+// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception:', error);
-    setTimeout(() => process.exit(1), 1000);
+    if (error.code === 'EADDRINUSE') {
+        logger.error(`Port ${process.env.PORT || 3000} is already in use`);
+        // Don't exit immediately on EADDRINUSE during startup
+        if (!server.listening) {
+            setTimeout(() => process.exit(1), 1000);
+        }
+    } else {
+        gracefulShutdown('uncaughtException');
+    }
 });
 
+// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
     logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    setTimeout(() => process.exit(1), 1000);
+    // Don't exit on unhandled rejections, just log them
 });
+
+// Graceful shutdown handler
+async function gracefulShutdown(signal) {
+    logger.info(`${signal} received. Starting graceful shutdown...`);
+    
+    // Stop accepting new connections
+    server.close(() => {
+        logger.info('HTTP server closed');
+    });
+    
+    // Close Socket.IO connections
+    if (io) {
+        io.close(() => {
+            logger.info('Socket.IO server closed');
+        });
+    }
+    
+    // Close all active connections
+    for (const connection of connections) {
+        connection.end();
+    }
+    
+    // Force close after timeout
+    setTimeout(() => {
+        for (const connection of connections) {
+            connection.destroy();
+        }
+    }, 5000);
+    
+    // Close database connections
+    try {
+        await database.close();
+        logger.info('Database connections closed');
+    } catch (error) {
+        logger.error('Error closing database:', error);
+    }
+    
+    // Stop scheduler service
+    try {
+        if (schedulerService && schedulerService.stop) {
+            await schedulerService.stop();
+            logger.info('Scheduler service stopped');
+        }
+    } catch (error) {
+        logger.error('Error stopping scheduler:', error);
+    }
+    
+    // Exit process
+    setTimeout(() => {
+        logger.info('Graceful shutdown complete');
+        process.exit(0);
+    }, 1000);
+}
+
+// Function to attempt binding to port with retries
+async function bindToPort(port, host, maxRetries = 5, retryDelay = 2000) {
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+        try {
+            await new Promise((resolve, reject) => {
+                const errorHandler = (err) => {
+                    if (err.code === 'EADDRINUSE') {
+                        server.removeListener('error', errorHandler);
+                        reject(err);
+                    } else {
+                        reject(err);
+                    }
+                };
+                
+                server.once('error', errorHandler);
+                
+                server.listen(port, host, () => {
+                    server.removeListener('error', errorHandler);
+                    resolve();
+                });
+            });
+            
+            return true; // Successfully bound to port
+            
+        } catch (error) {
+            attempts++;
+            
+            if (error.code === 'EADDRINUSE') {
+                if (attempts < maxRetries) {
+                    logger.warn(`Port ${port} is in use, attempt ${attempts}/${maxRetries}. Retrying in ${retryDelay/1000} seconds...`);
+                    
+                    // Try to kill any orphaned process on this port (Linux/Unix only)
+                    if (process.platform !== 'win32') {
+                        try {
+                            const { exec } = require('child_process');
+                            await new Promise((resolve) => {
+                                exec(`lsof -ti:${port} | xargs kill -9`, (error) => {
+                                    // Ignore errors as the command might fail if no process is found
+                                    resolve();
+                                });
+                            });
+                        } catch (e) {
+                            // Ignore errors from kill command
+                        }
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    throw error;
+                }
+            } else {
+                throw error;
+            }
+        }
+    }
+    
+    return false;
+}
 
 // Start the server
 startServer();
-
-// Send Startup notification
-sendStartupNotification();
 
 module.exports = { app, server, io };

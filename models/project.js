@@ -7,8 +7,9 @@ class ProjectModel {
             INSERT INTO projects (
                 title, description, status, project_manager_id, zip_code,
                 delivery_date, delivery_time, bid_due_date, max_bid, show_max_bid,
-                site_conditions, custom_fields
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                site_conditions, custom_fields, pecial_instructions, training_requirements,
+                access_control_info, product_care_info
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
@@ -23,7 +24,11 @@ class ProjectModel {
             projectData.max_bid || null,
             projectData.show_max_bid !== false ? 1 : 0,
             JSON.stringify(projectData.site_conditions || []),
-            JSON.stringify(projectData.custom_fields || {})
+            JSON.stringify(projectData.custom_fields || {}),
+            projectData.special_instructions || null,
+            projectData.training_requirements || null,
+            projectData.access_control_info || null,
+            projectData.product_care_info || null
         ];
         
         try {
@@ -138,11 +143,6 @@ class ProjectModel {
         
         const sql = `UPDATE projects SET ${fields}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
         return db.run(sql, values);
-    }
-    
-    static async updateStatus(id, status) {
-        const sql = `UPDATE projects SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-        return db.run(sql, [status, id]);
     }
     
     static async awardProject(projectId, bidId, amount) {

@@ -6,10 +6,12 @@ const BidModel = require('../models/bid');
 const FileModel = require('../models/file');
 const UserModel = require('../models/user');
 const fileService = require('../services/fileService');
+const emailService = require('../services/microsoftEmailService');
 const NotificationService = require('../services/notificationService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const logger = require('../utils/logger');
+const db = require('../models/database');
 
 // Get all projects
 router.get('/', authenticateToken, async (req, res) => {
@@ -132,6 +134,19 @@ router.post('/', [
         
         const projectId = await ProjectModel.create(projectData);
         const project = await ProjectModel.getById(projectId);
+
+        // Send email notification to admins
+        if (!process.env.DISABLE_EMAIL || process.env.DISABLE_EMAIL !== 'true') {
+            emailService.sendProjectCreationEmail(project, req.user)
+                .then(result => {
+                    if (!result.success) {
+                        logger.error('Failed to send project creation emails:', result.error);
+                    }
+                })
+                .catch(error => {
+                    logger.error('Error in email notification:', error);
+                });
+        }
         
         logger.info(`Project created: ${project.title} by ${req.user.username}`);
         
@@ -295,6 +310,8 @@ router.post('/:id/start-bidding', [
             return res.status(400).json({ error: 'Project must be in draft status to start bidding' });
         }
 
+        await ProjectModel.updateStatus(req.params.id, 'bidding');
+
         // Notify installation companies
         await NotificationService.broadcastToRole(
             'installation_company',
@@ -356,6 +373,13 @@ router.post('/:id/award', [
                 await NotificationService.notifyBidStatusChange(otherBid, project, 'lost');
             }
         }
+
+        const winningBid = await BidModel.getById(req.body.bidId);
+        const allBids = await BidModel.getProjectBids(project.id);
+        
+        // Send award emails to all bidders
+        emailService.sendBidAwardEmails(project, winningBid, allBids)
+            .catch(error => logger.error('Email error:', error));
         
         logger.info(`Project awarded: ${project.id} to bid ${bid.id} with comment: ${req.body.comment || 'none'}`);
         
@@ -414,6 +438,16 @@ router.post('/:id/complete', [
                 });
             }
         }
+
+        // Get winner details
+        const winner = await db.get(
+            'SELECT * FROM users WHERE id = ?',
+            [project.awarded_to]
+        );
+        
+        // Send completion email
+        emailService.sendProjectCompletionEmail(project, winner)
+            .catch(error => logger.error('Email error:', error));
         
         logger.info(`Project completed: ${project.id}`);
         
