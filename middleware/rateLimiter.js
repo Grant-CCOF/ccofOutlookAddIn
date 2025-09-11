@@ -215,11 +215,34 @@ const trackRequestPatterns = (req, res, next) => {
     next();
 };
 
+// Password reset rate limiter
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 requests per hour per IP+email combination
+    message: 'Too many password reset attempts. Please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: new CustomStore(60 * 60 * 1000),
+    keyGenerator: (req) => {
+        // Use IP + email combination for rate limiting
+        return `reset_${req.ip}:${req.body.email || 'unknown'}`;
+    },
+    handler: (req, res) => {
+        logger.warn(`Password reset rate limit exceeded for IP: ${req.ip}, Email: ${req.body.email}`);
+        res.status(429).json({
+            error: 'Too many password reset attempts',
+            message: 'Please wait before requesting another password reset. Check your spam folder for existing emails.',
+            retryAfter: res.getHeader('Retry-After')
+        });
+    },
+});
+
 module.exports = {
     generalLimiter,
     authLimiter,
     apiLimiter: createApiLimiter(),
     uploadLimiter,
+    passwordResetLimiter,
     dynamicLimiter,
     trackRequestPatterns,
     CustomStore

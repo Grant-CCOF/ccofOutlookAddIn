@@ -274,8 +274,10 @@ API.auth = {
     changePassword: (currentPassword, newPassword) => 
         API.post('/auth/change-password', { currentPassword, newPassword }),
     forgotPassword: (email) => API.post('/auth/forgot-password', { email }),
-    resetPassword: (token, newPassword) => 
-        API.post('/auth/reset-password', { token, newPassword })
+    verifyResetCode: (token, code) => 
+        API.post('/auth/verify-reset-code', { token, code }),
+    resetPassword: (tempToken, newPassword) => 
+        API.post('/auth/reset-password', { tempToken, newPassword })
 };
 
 API.projects = {

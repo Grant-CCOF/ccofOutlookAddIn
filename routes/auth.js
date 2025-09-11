@@ -7,6 +7,8 @@ const AuthService = require('../services/authService');
 const { handleValidationErrors } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const PasswordResetService = require('../services/passwordResetService');
+const { passwordResetLimiter } = require('../middleware/rateLimiter');
 
 // Login endpoint
 router.post('/login', [
@@ -229,74 +231,111 @@ router.post('/change-password', [
     }
 });
 
-// Request password reset
 router.post('/forgot-password', [
-    body('email').isEmail().withMessage('Valid email is required'),
+    passwordResetLimiter,
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     handleValidationErrors
 ], async (req, res) => {
     try {
         const { email } = req.body;
+        const ipAddress = req.ip || req.connection.remoteAddress;
+        const userAgent = req.get('user-agent');
         
-        const user = await UserModel.getByEmail(email);
+        // Create reset request
+        const result = await PasswordResetService.createResetRequest(
+            email, 
+            ipAddress, 
+            userAgent
+        );
         
-        if (!user) {
-            // Don't reveal if email exists
-            return res.json({ message: 'If the email exists, a reset link has been sent' });
+        if (!result.success && result.error) {
+            // Rate limit exceeded
+            return res.status(429).json({ 
+                error: result.error 
+            });
         }
         
-        const resetToken = AuthService.generateResetToken();
+        // Always return same message for security
+        res.json({ 
+            message: 'If the email exists in our system, a password reset link has been sent.',
+            // Include debug info only in development
+            debug: result.debug
+        });
         
-        // In production, store this token in database with expiry
-        // For now, we'll send it in the email
-        
-        // await emailService.sendPasswordResetEmail(user, resetToken);
-        
-        logger.info(`Password reset requested for: ${email}`);
-        
-        res.json({ message: 'If the email exists, a reset link has been sent' });
     } catch (error) {
         logger.error('Password reset request error:', error);
-        res.status(500).json({ error: 'Failed to process password reset request' });
+        res.status(500).json({ 
+            error: 'Failed to process password reset request' 
+        });
+    }
+});
+
+router.post('/verify-reset-code', [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('code')
+        .notEmpty()
+        .matches(/^\d{6}$/)
+        .withMessage('Valid 6-digit code is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { token, code } = req.body;
+        
+        const result = await PasswordResetService.verifyTokenAndCode(token, code);
+        
+        if (!result.valid) {
+            return res.status(400).json({ 
+                error: result.error 
+            });
+        }
+        
+        res.json({ 
+            success: true,
+            tempToken: result.tempToken,
+            email: result.email ? result.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') : null
+        });
+        
+    } catch (error) {
+        logger.error('Code verification error:', error);
+        res.status(500).json({ 
+            error: 'Verification failed' 
+        });
     }
 });
 
 // Reset password
 router.post('/reset-password', [
-    body('token').notEmpty().withMessage('Reset token is required'),
+    body('tempToken').notEmpty().withMessage('Authorization token is required'),
     body('newPassword')
         .isLength({ min: 8 })
         .withMessage('Password must be at least 8 characters')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-        .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+        .withMessage('Password must contain uppercase, lowercase, and number'),
     handleValidationErrors
 ], async (req, res) => {
     try {
-        const { token, newPassword } = req.body;
+        const { tempToken, newPassword } = req.body;
         
-        const decoded = AuthService.verifyToken(token);
+        const result = await PasswordResetService.resetPassword(
+            tempToken, 
+            newPassword
+        );
         
-        if (!decoded || decoded.type !== 'password_reset') {
-            return res.status(401).json({ error: 'Invalid or expired reset token' });
+        if (!result.success) {
+            return res.status(400).json({ 
+                error: result.error 
+            });
         }
         
-        // In production, verify token from database
-        // For now, we'll just reset the password
+        res.json({ 
+            message: 'Password has been reset successfully. You can now login with your new password.' 
+        });
         
-        // This is a simplified version - in production, you'd get user ID from the token
-        // const userId = decoded.userId;
-        
-        // Hash new password
-        const hashedPassword = await AuthService.hashPassword(newPassword);
-        
-        // Update password (simplified - need proper implementation)
-        // await UserModel.updatePassword(userId, hashedPassword);
-        
-        logger.info('Password reset completed');
-        
-        res.json({ message: 'Password reset successfully' });
     } catch (error) {
         logger.error('Password reset error:', error);
-        res.status(500).json({ error: 'Failed to reset password' });
+        res.status(500).json({ 
+            error: 'Failed to reset password' 
+        });
     }
 });
 

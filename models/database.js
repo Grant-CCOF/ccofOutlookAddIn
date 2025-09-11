@@ -107,6 +107,22 @@ class Database {
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 deleted_at DATETIME
             )`,
+
+            `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                verification_code TEXT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME,
+                attempts INTEGER DEFAULT 0,
+                ip_address TEXT,
+                user_agent TEXT,
+                temp_token TEXT,
+                temp_token_expires_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )`,
             
             `CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,6 +231,9 @@ class Database {
             `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)`,
             `CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(rated_user_id)`
+            `CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_hash)`,
+            `CREATE INDEX IF NOT EXISTS idx_reset_expires ON password_reset_tokens(expires_at)`,
+            `CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens(user_id)`
         ];
 
         for (const query of queries) {

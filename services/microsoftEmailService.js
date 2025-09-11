@@ -330,7 +330,7 @@ class MicrosoftEmailService {
                                 <p>${project.description}</p>
                                 
                                 <center>
-                                    <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                    <a href="${process.env.APP_URL}/#/projects/${project.id}" class="button">
                                         View Project Details
                                     </a>
                                 </center>
@@ -421,7 +421,7 @@ class MicrosoftEmailService {
                                 </div>
                                 
                                 <center>
-                                    <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                    <a href="${process.env.APP_URL}/#/projects/${project.id}" class="button">
                                         View Project Summary
                                     </a>
                                 </center>
@@ -496,7 +496,7 @@ class MicrosoftEmailService {
                             ` : '<p>No bids were received for this project.</p>'}
                             
                             <center>
-                                <a href="${process.env.APP_URL}/projects/${project.id}/bids" class="button">
+                                <a href="${process.env.APP_URL}/#/projects/${project.id}/bids" class="button">
                                     Review All Bids
                                 </a>
                             </center>
@@ -589,7 +589,7 @@ class MicrosoftEmailService {
                             </div>
                             
                             <center>
-                                <a href="${process.env.APP_URL}/projects/${project.id}/bids" class="button">
+                                <a href="${process.env.APP_URL}/#/projects/${project.id}/bids" class="button">
                                     View All Bids
                                 </a>
                             </center>
@@ -681,7 +681,7 @@ class MicrosoftEmailService {
                         </ol>
                         
                         <center>
-                            <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                            <a href="${process.env.APP_URL}/#/projects/${project.id}" class="button">
                                 View Project Details
                             </a>
                         </center>
@@ -720,7 +720,7 @@ class MicrosoftEmailService {
                         <p>We appreciate your participation and encourage you to bid on future projects. Your competitive bids help ensure the best value for our clients.</p>
                         
                         <center>
-                            <a href="${process.env.APP_URL}/projects" class="button">
+                            <a href="${process.env.APP_URL}/#/projects" class="button">
                                 View Other Projects
                             </a>
                         </center>
