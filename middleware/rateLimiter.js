@@ -7,12 +7,22 @@ const requestCounts = new Map();
 
 // Custom store for rate limiting
 class CustomStore {
-    constructor(windowMs) {
-        this.windowMs = windowMs;
+    constructor() {
         this.requests = new Map();
+        this.windowMs = 60000; // Default, will be set by init()
+        this.interval = null;
+    }
+    
+    // Init method is called by express-rate-limit with options
+    async init(options) {
+        this.windowMs = options.windowMs;
         
         // Clean up old entries periodically
-        setInterval(() => {
+        if (this.interval) {
+            clearInterval(this.interval);
+        }
+        
+        this.interval = setInterval(() => {
             const now = Date.now();
             for (const [key, data] of this.requests.entries()) {
                 if (now - data.resetTime > this.windowMs) {
@@ -22,16 +32,35 @@ class CustomStore {
         }, this.windowMs);
     }
     
-    increment(key) {
-        const now = Date.now();
-        const record = this.requests.get(key) || {
-            count: 0,
-            resetTime: now + this.windowMs
-        };
+    // Get method to retrieve current hit count
+    async get(key) {
+        const record = this.requests.get(key);
+        if (!record) {
+            return undefined;
+        }
         
+        const now = Date.now();
         if (now > record.resetTime) {
-            record.count = 1;
-            record.resetTime = now + this.windowMs;
+            this.requests.delete(key);
+            return undefined;
+        }
+        
+        return {
+            totalHits: record.count,
+            resetTime: new Date(record.resetTime)
+        };
+    }
+    
+    // Increment the hit counter for a key
+    async increment(key) {
+        const now = Date.now();
+        let record = this.requests.get(key);
+        
+        if (!record || now > record.resetTime) {
+            record = {
+                count: 1,
+                resetTime: now + this.windowMs
+            };
         } else {
             record.count++;
         }
@@ -39,20 +68,37 @@ class CustomStore {
         this.requests.set(key, record);
         
         return {
-            count: record.count,
+            totalHits: record.count,
             resetTime: new Date(record.resetTime)
         };
     }
     
-    decrement(key) {
+    // Decrement the hit counter for a key
+    async decrement(key) {
         const record = this.requests.get(key);
-        if (record) {
-            record.count = Math.max(0, record.count - 1);
+        if (record && record.count > 0) {
+            record.count--;
+            this.requests.set(key, record);
         }
     }
     
-    reset(key) {
+    // Reset a specific key
+    async resetKey(key) {
         this.requests.delete(key);
+    }
+    
+    // Reset all keys
+    async resetAll() {
+        this.requests.clear();
+    }
+    
+    // Cleanup method
+    async shutdown() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        this.requests.clear();
     }
 }
 
@@ -63,7 +109,7 @@ const generalLimiter = rateLimit({
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    store: new CustomStore(RATE_LIMITS.GENERAL.WINDOW_MS),
+    store: new CustomStore(), // No need to pass windowMs
     handler: (req, res) => {
         logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({
@@ -73,7 +119,6 @@ const generalLimiter = rateLimit({
         });
     },
     skip: (req) => {
-        // Skip rate limiting for certain IPs (whitelist)
         const whitelist = process.env.RATE_LIMIT_WHITELIST?.split(',') || [];
         return whitelist.includes(req.ip);
     }
@@ -86,8 +131,8 @@ const authLimiter = rateLimit({
     message: 'Too many authentication attempts, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    store: new CustomStore(RATE_LIMITS.AUTH.WINDOW_MS),
-    skipSuccessfulRequests: true, // Don't count successful auth requests
+    store: new CustomStore(), // Changed here
+    skipSuccessfulRequests: true,
     handler: (req, res) => {
         logger.error(`Auth rate limit exceeded for IP: ${req.ip}, Username: ${req.body.username}`);
         res.status(429).json({
@@ -103,25 +148,23 @@ const createApiLimiter = () => {
     return rateLimit({
         windowMs: RATE_LIMITS.API.WINDOW_MS,
         max: (req) => {
-            // Different limits based on user role
             if (!req.user) return RATE_LIMITS.API.MAX_REQUESTS;
             
             switch (req.user.role) {
                 case 'admin':
-                    return RATE_LIMITS.API.MAX_REQUESTS * 3; // Admins get 3x limit
+                    return RATE_LIMITS.API.MAX_REQUESTS * 3;
                 case 'project_manager':
-                    return RATE_LIMITS.API.MAX_REQUESTS * 2; // Project managers get 2x limit
+                    return RATE_LIMITS.API.MAX_REQUESTS * 2;
                 default:
                     return RATE_LIMITS.API.MAX_REQUESTS;
             }
         },
         keyGenerator: (req) => {
-            // Use user ID if authenticated, otherwise use IP
             return req.user ? `user_${req.user.id}` : req.ip;
         },
         standardHeaders: true,
         legacyHeaders: false,
-        store: new CustomStore(RATE_LIMITS.API.WINDOW_MS),
+        store: new CustomStore(), // Changed here
         handler: (req, res) => {
             const identifier = req.user ? `User ${req.user.id}` : `IP ${req.ip}`;
             logger.warn(`API rate limit exceeded for ${identifier}`);
@@ -136,11 +179,12 @@ const createApiLimiter = () => {
 
 // File upload rate limiter
 const uploadLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 uploads per window
+    windowMs: 15 * 60 * 1000,
+    max: 10,
     message: 'Too many file uploads, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
+    store: new CustomStore(), // Changed here
     handler: (req, res) => {
         logger.warn(`Upload rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({
@@ -149,6 +193,26 @@ const uploadLimiter = rateLimit({
             retryAfter: res.getHeader('Retry-After')
         });
     }
+});
+
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 3,
+    message: 'Too many password reset attempts. Please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: new CustomStore(), // Changed here
+    keyGenerator: (req) => {
+        return `reset_${req.ip}:${req.body.email || 'unknown'}`;
+    },
+    handler: (req, res) => {
+        logger.warn(`Password reset rate limit exceeded for IP: ${req.ip}, Email: ${req.body.email}`);
+        res.status(429).json({
+            error: 'Too many password reset attempts',
+            message: 'Please wait before requesting another password reset. Check your spam folder for existing emails.',
+            retryAfter: res.getHeader('Retry-After')
+        });
+    },
 });
 
 // Dynamic rate limiter based on endpoint
@@ -165,7 +229,7 @@ const dynamicLimiter = (options = {}) => {
         ...config,
         standardHeaders: true,
         legacyHeaders: false,
-        store: new CustomStore(config.windowMs),
+        store: new CustomStore(), // Changed here
         handler: (req, res) => {
             logger.warn(`Dynamic rate limit exceeded for IP: ${req.ip}, Endpoint: ${req.originalUrl}`);
             res.status(429).json({
@@ -214,28 +278,6 @@ const trackRequestPatterns = (req, res, next) => {
     
     next();
 };
-
-// Password reset rate limiter
-const passwordResetLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 requests per hour per IP+email combination
-    message: 'Too many password reset attempts. Please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
-    store: new CustomStore(60 * 60 * 1000),
-    keyGenerator: (req) => {
-        // Use IP + email combination for rate limiting
-        return `reset_${req.ip}:${req.body.email || 'unknown'}`;
-    },
-    handler: (req, res) => {
-        logger.warn(`Password reset rate limit exceeded for IP: ${req.ip}, Email: ${req.body.email}`);
-        res.status(429).json({
-            error: 'Too many password reset attempts',
-            message: 'Please wait before requesting another password reset. Check your spam folder for existing emails.',
-            retryAfter: res.getHeader('Retry-After')
-        });
-    },
-});
 
 module.exports = {
     generalLimiter,

@@ -167,7 +167,7 @@ class PasswordResetService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🔒 Password Reset Request</h1>
+                        <h1>Password Reset Request</h1>
                     </div>
                     <div class="content">
                         <p>Hello <strong>${user.name}</strong>,</p>
@@ -185,7 +185,7 @@ class PasswordResetService {
                         </center>
                         
                         <div class="warning">
-                            <strong>⚠️ Security Notice:</strong><br>
+                            <strong>Security Notice:</strong><br>
                             If you did not request this password reset, please ignore this email and your password will remain unchanged. 
                             Consider changing your password if you suspect unauthorized access attempts.
                         </div>
@@ -272,7 +272,7 @@ Capital Choice Platform
         try {
             // Verify temp token
             const decoded = jwt.verify(
-                tempToken, 
+                tempToken,
                 process.env.JWT_SECRET || 'your-secret-key'
             );
             
@@ -280,76 +280,153 @@ Capital Choice Platform
                 return { success: false, error: 'Invalid token type' };
             }
             
-            // Get reset token from database
-            const resetToken = await PasswordResetModel.findByTempToken(tempToken);
+            // Get the reset token record to get user information
+            const resetToken = await PasswordResetModel.getById(decoded.resetTokenId);
             
             if (!resetToken) {
                 return { success: false, error: 'Invalid or expired token' };
             }
             
-            // Validate password strength
-            const validation = AuthService.validatePasswordStrength(newPassword);
-            if (!validation.valid) {
-                return { success: false, error: validation.errors.join(', ') };
+            // Get the user BEFORE updating password
+            const user = await UserModel.getById(resetToken.user_id);
+            
+            if (!user) {
+                return { success: false, error: 'User not found' };
             }
             
-            // Hash new password
-            const hashedPassword = await AuthService.hashPassword(newPassword);
+            // Hash the new password
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
             
             // Update user password
             await UserModel.updatePassword(resetToken.user_id, hashedPassword);
             
             // Mark token as used
-            await PasswordResetModel.markAsUsed(resetToken.id);
+            await PasswordResetModel.markAsUsed(decoded.resetTokenId);
             
-            // Invalidate all other reset tokens for this user
-            await PasswordResetModel.invalidateAllUserTokens(resetToken.user_id);
+            // Send success email - make sure user object has email
+            try {
+                if (user.email) {
+                    await this.sendPasswordResetSuccessEmail(user);
+                } else {
+                    logger.warn(`No email found for user ${user.id} - skipping success email`);
+                }
+            } catch (emailError) {
+                // Log email error but don't fail the password reset
+                logger.error('Failed to send success email:', emailError);
+                // Continue - password was still reset successfully
+            }
             
-            // Send confirmation email
-            await this.sendPasswordChangedEmail(resetToken);
+            logger.info(`Password reset successful for user: ${user.username}`);
             
-            logger.info(`Password reset successful for user: ${resetToken.username}`);
-            
-            return { success: true };
+            return { 
+                success: true, 
+                message: 'Password has been reset successfully' 
+            };
             
         } catch (error) {
-            logger.error('Error resetting password:', error);
-            return { success: false, error: 'Password reset failed' };
+            logger.error('Password reset error:', error);
+            return { success: false, error: 'Failed to reset password' };
         }
     }
     
     // Send password changed confirmation
-    static async sendPasswordChangedEmail(resetToken) {
-        const subject = 'Password Changed Successfully - Capital Choice';
+    static async sendPasswordResetSuccessEmail(user) {
+        // Ensure user has email
+        if (!user || !user.email) {
+            logger.error('Cannot send success email - user or email missing', { user });
+            return false;
+        }
+        
+        const subject = 'Password Successfully Reset - Capital Choice';
         
         const htmlContent = `
             <!DOCTYPE html>
             <html>
             <head>
                 <style>
-                    body { font-family: 'Segoe UI', sans-serif; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; }
-                    .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
-                    .content { padding: 20px; background-color: #f8f9fa; }
-                    .footer { text-align: center; padding: 10px; color: #6c757d; }
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        line-height: 1.6; 
+                        color: #333; 
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .container { 
+                        max-width: 600px; 
+                        margin: 0 auto; 
+                        padding: 20px; 
+                    }
+                    .header { 
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white; 
+                        padding: 30px 20px; 
+                        text-align: center; 
+                        border-radius: 10px 10px 0 0;
+                    }
+                    .content { 
+                        padding: 30px 20px; 
+                        background-color: #ffffff;
+                        border: 1px solid #e1e4e8;
+                        border-radius: 0 0 10px 10px;
+                    }
+                    .success-icon {
+                        text-align: center;
+                        margin: 20px 0;
+                    }
+                    .button { 
+                        display: inline-block; 
+                        padding: 12px 30px; 
+                        background-color: #4a90e2; 
+                        color: white; 
+                        text-decoration: none; 
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                    .footer { 
+                        text-align: center; 
+                        padding: 20px; 
+                        color: #666;
+                        font-size: 12px;
+                    }
                 </style>
             </head>
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>✓ Password Changed Successfully</h1>
+                        <h1>Password Reset Successful</h1>
                     </div>
                     <div class="content">
-                        <p>Hello ${resetToken.name},</p>
-                        <p>Your password has been successfully changed.</p>
-                        <p><strong>Details:</strong></p>
-                        <ul>
-                            <li>Date: ${new Date().toLocaleString()}</li>
-                            <li>IP Address: ${resetToken.ip_address || 'Unknown'}</li>
-                        </ul>
-                        <p>If you did not make this change, please contact support immediately.</p>
+                        <div class="success-icon">
+                            <div style="font-size: 48px; color: #28a745;">✓</div>
+                        </div>
+                        
+                        <p>Hello <strong>${user.name || user.username}</strong>,</p>
+                        
+                        <p>Your password for Capital Choice account (<strong>${user.email}</strong>) has been successfully reset.</p>
+                        
+                        <p>You can now log in with your new password.</p>
+                        
+                        <center style="margin: 30px 0;">
+                            <a href="${process.env.APP_URL || 'http://localhost:3000'}" class="button">
+                                Go to Login
+                            </a>
+                        </center>
+                        
+                        <div style="background: #fef5e7; padding: 15px; border-radius: 5px; margin-top: 20px;">
+                            <strong>Security Tips:</strong>
+                            <ul style="margin: 10px 0;">
+                                <li>Never share your password with anyone</li>
+                                <li>Use a unique password for each account</li>
+                                <li>Consider using a password manager</li>
+                            </ul>
+                        </div>
+                        
+                        <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                            If you did not make this change, please contact our support team immediately.
+                        </p>
                     </div>
                     <div class="footer">
+                        <p>This is an automated message from Capital Choice Platform</p>
                         <p>&copy; ${new Date().getFullYear()} Capital Choice. All rights reserved.</p>
                     </div>
                 </div>
@@ -357,11 +434,36 @@ Capital Choice Platform
             </html>
         `;
         
-        await microsoftEmailService.sendEmail(
-            resetToken.email,
-            subject,
-            htmlContent
-        );
+        const textContent = `
+    Password Reset Successful - Capital Choice
+
+    Hello ${user.name || user.username},
+
+    Your password for Capital Choice account (${user.email}) has been successfully reset.
+
+    You can now log in with your new password.
+
+    Security Tips:
+    - Never share your password with anyone
+    - Use a unique password for each account
+    - Consider using a password manager
+
+    If you did not make this change, please contact our support team immediately.
+
+    Capital Choice Platform
+        `;
+        
+        try {
+            return await microsoftEmailService.sendEmail(
+                user.email,
+                subject,
+                htmlContent,
+                textContent
+            );
+        } catch (error) {
+            logger.error('Failed to send password reset success email:', error);
+            return false;
+        }
     }
 }
 

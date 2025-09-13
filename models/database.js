@@ -230,7 +230,7 @@ class Database {
             `CREATE INDEX IF NOT EXISTS idx_bids_user ON bids(user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_files_project ON files(project_id)`,
-            `CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(rated_user_id)`
+            `CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(rated_user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_reset_token_hash ON password_reset_tokens(token_hash)`,
             `CREATE INDEX IF NOT EXISTS idx_reset_expires ON password_reset_tokens(expires_at)`,
             `CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens(user_id)`

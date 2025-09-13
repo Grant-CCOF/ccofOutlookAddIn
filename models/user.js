@@ -30,9 +30,20 @@ class UserModel {
         }
     }
     
-    static async getById(id) {
-        const sql = `SELECT * FROM users WHERE id = ? AND deleted_at IS NULL`;
-        return db.get(sql, [id]);
+    static async getById(userId) {
+        try {
+            const result = await database.query(
+                `SELECT id, username, name, email, role, company, created_at, updated_at 
+                FROM users 
+                WHERE id = ?`,
+                [userId]
+            );
+            
+            return result[0] || null;
+        } catch (error) {
+            logger.error('Error fetching user by ID:', error);
+            throw error;
+        }
     }
 
     static async getByIdWithStats(id) {
