@@ -7,6 +7,7 @@ const BidModel = require('../models/bid');
 const RatingModel = require('../models/rating');
 const AuthService = require('../services/authService');
 const emailService = require('../services/emailService');
+const RegistrationService = require('../services/registrationService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const logger = require('../utils/logger');
@@ -199,15 +200,18 @@ router.put('/:id', [
     }
 });
 
-// Approve user (admin only)
-router.post('/:id/approve', [
+// Approve user
+router.put('/:id/approve', [
     authenticateToken,
     requireRole('admin'),
     param('id').isInt().withMessage('Valid user ID required'),
     handleValidationErrors
 ], async (req, res) => {
     try {
-        const user = await UserModel.getById(req.params.id);
+        const userId = req.params.id;
+        
+        // Get user details before approval
+        const user = await UserModel.getById(userId);
         
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -217,14 +221,38 @@ router.post('/:id/approve', [
             return res.status(400).json({ error: 'User is already approved' });
         }
         
-        await UserModel.update(req.params.id, { approved: 1 });
+        // Approve the user
+        await UserModel.update(userId, { approved: 1 });
         
-        // Send approval email
-        //await emailService.sendApprovalEmail(user);
+        // Send approval email if it's an installation company
+        if (user.role === 'installation_company' && user.email) {
+            try {
+                await RegistrationService.sendApprovalEmail(user);
+                logger.info(`Approval email sent to ${user.email}`);
+            } catch (emailError) {
+                logger.error('Failed to send approval email:', emailError);
+                // Don't fail the approval if email fails
+            }
+        }
         
-        logger.info(`User approved: ${user.username} by admin ${req.user.username}`);
+        // Create notification
+        await NotificationService.create({
+            user_id: userId,
+            title: 'Account Approved',
+            content: 'Your account has been approved. You can now access all features.',
+            type: 'account_approved',
+            data: JSON.stringify({ 
+                approved_by: req.user.id,
+                approved_at: new Date().toISOString() 
+            })
+        });
         
-        res.json({ message: 'User approved successfully' });
+        logger.info(`User ${userId} approved by admin ${req.user.id}`);
+        
+        res.json({ 
+            message: 'User approved successfully',
+            emailSent: user.role === 'installation_company' 
+        });
     } catch (error) {
         logger.error('Error approving user:', error);
         res.status(500).json({ error: 'Failed to approve user' });

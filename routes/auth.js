@@ -8,6 +8,7 @@ const { handleValidationErrors } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const PasswordResetService = require('../services/passwordResetService');
+const RegistrationService = require('../services/registrationService');
 const { passwordResetLimiter } = require('../middleware/rateLimiter');
 
 // Login endpoint
@@ -335,6 +336,176 @@ router.post('/reset-password', [
         logger.error('Password reset error:', error);
         res.status(500).json({ 
             error: 'Failed to reset password' 
+        });
+    }
+});
+
+// Request registration - sends email with verification code
+router.post('/request-registration', [
+    body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Valid email is required'),
+    handleValidationErrors
+], passwordResetLimiter, async (req, res) => {
+    try {
+        const { email } = req.body;
+        const ipAddress = req.ip;
+        const userAgent = req.get('user-agent');
+        
+        const result = await RegistrationService.createRegistrationRequest(
+            email,
+            ipAddress,
+            userAgent
+        );
+        
+        res.json({
+            success: result.success,
+            message: result.message || result.error,
+            // Include debug info only in development
+            debug: result.debug
+        });
+        
+    } catch (error) {
+        logger.error('Registration request error:', error);
+        res.status(500).json({ 
+            error: 'Failed to process registration request' 
+        });
+    }
+});
+
+// Verify registration code
+router.post('/verify-registration-code', [
+    body('token').notEmpty().withMessage('Registration token is required'),
+    body('code')
+        .notEmpty()
+        .matches(/^\d{6}$/)
+        .withMessage('Valid 6-digit code is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { token, code } = req.body;
+        
+        const result = await RegistrationService.verifyTokenAndCode(token, code);
+        
+        if (!result.valid) {
+            return res.status(400).json({ 
+                error: result.error 
+            });
+        }
+        
+        res.json({ 
+            success: true,
+            tempToken: result.tempToken,
+            email: result.email
+        });
+        
+    } catch (error) {
+        logger.error('Code verification error:', error);
+        res.status(500).json({ 
+            error: 'Verification failed' 
+        });
+    }
+});
+
+// Complete registration
+router.post('/complete-registration', [
+    body('tempToken').notEmpty().withMessage('Authorization token is required'),
+    body('username')
+        .isLength({ min: 3, max: 20 })
+        .withMessage('Username must be between 3 and 20 characters')
+        .matches(/^[a-zA-Z0-9_-]+$/)
+        .withMessage('Username can only contain letters, numbers, underscores, and hyphens'),
+    body('password')
+        .isLength({ min: 8 })
+        .withMessage('Password must be at least 8 characters')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        .withMessage('Password must contain uppercase, lowercase, and number'),
+    body('name').notEmpty().withMessage('Full name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('company').notEmpty().withMessage('Company name is required'),
+    body('phone')
+        .matches(/^[\d\s\-\+\(\)]+$/)
+        .withMessage('Valid phone number is required'),
+    body('position').notEmpty().withMessage('Position/title is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { 
+            tempToken, 
+            username, 
+            password, 
+            name, 
+            email, 
+            company, 
+            phone, 
+            position 
+        } = req.body;
+        
+        const result = await RegistrationService.completeRegistration(
+            tempToken,
+            {
+                username,
+                password,
+                name,
+                email,
+                company,
+                phone,
+                position
+            }
+        );
+        
+        if (!result.success) {
+            return res.status(400).json({ 
+                error: result.error 
+            });
+        }
+        
+        res.json({ 
+            message: result.message 
+        });
+        
+    } catch (error) {
+        logger.error('Registration completion error:', error);
+        res.status(500).json({ 
+            error: 'Failed to complete registration' 
+        });
+    }
+});
+
+// Validate registration token (for checking if token is still valid)
+router.get('/validate-registration-token', [
+    query('token').notEmpty().withMessage('Token is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { token } = req.query;
+        const RegistrationTokenModel = require('../models/registrationToken');
+        
+        const tokenHash = require('crypto')
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+        
+        const regToken = await RegistrationTokenModel.getByTokenHash(tokenHash);
+        
+        if (!regToken) {
+            return res.json({ 
+                valid: false, 
+                error: 'Invalid or expired token' 
+            });
+        }
+        
+        res.json({ 
+            valid: true,
+            email: regToken.email,
+            verified: !!regToken.verified_at
+        });
+        
+    } catch (error) {
+        logger.error('Token validation error:', error);
+        res.status(500).json({ 
+            error: 'Validation failed' 
         });
     }
 });

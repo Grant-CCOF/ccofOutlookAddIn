@@ -261,6 +261,35 @@ const API = {
     cancelAll() {
         // Implementation depends on how we track requests
         Config.log('Cancelling all pending requests');
+    },
+
+    // Request registration (send email)
+    async requestRegistration(email) {
+        return this.request('/api/auth/request-registration', {
+            method: 'POST',
+            body: JSON.stringify({ email })
+        });
+    },
+
+    // Verify registration code
+    async verifyRegistrationCode(token, code) {
+        return this.request('/api/auth/verify-registration-code', {
+            method: 'POST',
+            body: JSON.stringify({ token, code })
+        });
+    },
+
+    // Complete registration
+    async completeRegistration(data) {
+        return this.request('/api/auth/complete-registration', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    },
+
+    // Validate registration token
+    async validateRegistrationToken(token) {
+        return this.request(`/api/auth/validate-registration-token?token=${encodeURIComponent(token)}`);
     }
 };
 

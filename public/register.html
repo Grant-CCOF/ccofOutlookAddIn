@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Registration - Capital Choice</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-container" style="max-width: 600px;">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <img src="https://ccofficefurniture.com/wp-content/uploads/2025/02/Capital-Choice-20th-logo-Final-with-Tag-Blue.svg" 
+                         alt="Capital Choice" 
+                         class="auth-logo">
+                    <h2>Complete Registration</h2>
+                    <p>Installation Company Account Setup</p>
+                </div>
+                
+                <!-- Step Indicator -->
+                <div class="step-indicator" style="display: flex; justify-content: space-between; margin-bottom: 30px; padding: 0 20px;">
+                    <div class="step active" id="step1">
+                        <div class="step-circle" style="width: 30px; height: 30px; border-radius: 50%; background: #4a90e2; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 5px;">1</div>
+                        <div class="step-label" style="font-size: 12px; color: #6c757d;">Verify Code</div>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-circle" style="width: 30px; height: 30px; border-radius: 50%; background: #e9ecef; color: #6c757d; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 5px;">2</div>
+                        <div class="step-label" style="font-size: 12px; color: #6c757d;">Account Details</div>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-circle" style="width: 30px; height: 30px; border-radius: 50%; background: #e9ecef; color: #6c757d; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 5px;">3</div>
+                        <div class="step-label" style="font-size: 12px; color: #6c757d;">Pending Approval</div>
+                    </div>
+                </div>
+                
+                <!-- Alert Messages -->
+                <div id="alertMessage" class="alert" style="display: none; margin-bottom: 20px;"></div>
+                
+                <!-- Step 1: Verify Code -->
+                <div id="verifyStep" class="step-content">
+                    <form id="verifyForm" class="auth-form">
+                        <div class="form-group">
+                            <label for="verificationCode">Enter Verification Code</label>
+                            <input type="text" 
+                                   id="verificationCode" 
+                                   name="code" 
+                                   class="form-control text-center" 
+                                   placeholder="000000"
+                                   maxlength="6"
+                                   pattern="\d{6}"
+                                   style="font-size: 24px; letter-spacing: 5px;"
+                                   required>
+                            <small class="form-text text-muted">
+                                Enter the 6-digit code sent to your email
+                            </small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block" id="verifyBtn">
+                            Verify Code
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Step 2: Registration Form -->
+                <div id="registrationStep" class="step-content" style="display: none;">
+                    <form id="registrationForm" class="auth-form">
+                        <!-- Account Information -->
+                        <h5 style="margin-bottom: 20px; color: #495057;">Account Information</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="username">Username <span class="text-danger">*</span></label>
+                                    <input type="text" 
+                                           id="username" 
+                                           name="username" 
+                                           class="form-control" 
+                                           pattern="[a-zA-Z0-9_-]{3,20}"
+                                           required>
+                                    <small class="form-text text-muted">3-20 characters, letters, numbers, underscore, hyphen</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="email">Email <span class="text-danger">*</span></label>
+                                    <input type="email" 
+                                           id="email" 
+                                           name="email" 
+                                           class="form-control" 
+                                           readonly
+                                           style="background-color: #f8f9fa;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="password">Password <span class="text-danger">*</span></label>
+                                    <div class="password-input" style="position: relative;">
+                                        <input type="password" 
+                                               id="password" 
+                                               name="password" 
+                                               class="form-control" 
+                                               required>
+                                        <button type="button" class="btn-icon toggle-password" data-target="password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6c757d;">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="confirmPassword">Confirm Password <span class="text-danger">*</span></label>
+                                    <div class="password-input" style="position: relative;">
+                                        <input type="password" 
+                                               id="confirmPassword" 
+                                               name="confirmPassword" 
+                                               class="form-control" 
+                                               required>
+                                        <button type="button" class="btn-icon toggle-password" data-target="confirmPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6c757d;">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Password Requirements -->
+                        <div class="password-requirements" style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 12px;">
+                            <div id="lengthReq" style="color: #dc3545;">
+                                <i class="fas fa-times-circle"></i> At least 8 characters
+                            </div>
+                            <div id="upperReq" style="color: #dc3545;">
+                                <i class="fas fa-times-circle"></i> One uppercase letter
+                            </div>
+                            <div id="lowerReq" style="color: #dc3545;">
+                                <i class="fas fa-times-circle"></i> One lowercase letter
+                            </div>
+                            <div id="numberReq" style="color: #dc3545;">
+                                <i class="fas fa-times-circle"></i> One number
+                            </div>
+                        </div>
+                        
+                        <!-- Personal Information -->
+                        <h5 style="margin-bottom: 20px; color: #495057;">Personal Information</h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="name">Full Name <span class="text-danger">*</span></label>
+                                    <input type="text" 
+                                           id="name" 
+                                           name="name" 
+                                           class="form-control" 
+                                           required>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="phone">Phone Number <span class="text-danger">*</span></label>
+                                    <input type="tel" 
+                                           id="phone" 
+                                           name="phone" 
+                                           class="form-control" 
+                                           placeholder="(555) 123-4567"
+                                           required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Company Information -->
+                        <h5 style="margin-bottom: 20px; color: #495057;">Company Information</h5>
+                        
+                        <div class="form-group">
+                            <label for="company">Company Name <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   id="company" 
+                                   name="company" 
+                                   class="form-control" 
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="position">Position/Title <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   id="position" 
+                                   name="position" 
+                                   class="form-control" 
+                                   placeholder="e.g., Project Manager, Owner, Installation Lead"
+                                   required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block" id="registerBtn">
+                            Complete Registration
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Step 3: Success - Pending Approval -->
+                <div id="successStep" class="step-content" style="display: none;">
+                    <div class="text-center">
+                        <div style="font-size: 60px; color: #ffc107; margin-bottom: 20px;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h3 style="margin-bottom: 15px;">Registration Successful!</h3>
+                        <p class="text-muted" style="margin-bottom: 25px;">
+                            Your account has been created and is pending admin approval.
+                        </p>
+                        
+                        <div class="alert alert-info text-left">
+                            <h5><i class="fas fa-info-circle"></i> What happens next?</h5>
+                            <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                                <li>An administrator will review your registration</li>
+                                <li>You'll receive an email once your account is approved</li>
+                                <li>Approval typically takes 1-2 business days</li>
+                                <li>Once approved, you can log in and start bidding on projects</li>
+                            </ul>
+                        </div>
+                        
+                        <a href="/" class="btn btn-primary btn-block">
+                            Return to Login
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Error State -->
+                <div id="errorStep" class="step-content" style="display: none;">
+                    <div class="text-center">
+                        <div style="font-size: 60px; color: #dc3545; margin-bottom: 20px;">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <h3 style="margin-bottom: 15px;">Invalid or Expired Link</h3>
+                        <p class="text-muted" style="margin-bottom: 25px;">
+                            This registration link is invalid or has expired. Please request a new registration link.
+                        </p>
+                        <a href="/register-request.html" class="btn btn-primary btn-block">
+                            Request New Registration
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let registrationToken = null;
+        let tempToken = null;
+        let userEmail = null;
+        
+        // Get token from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        registrationToken = urlParams.get('token');
+        
+        // Elements
+        const alertDiv = document.getElementById('alertMessage');
+        const verifyForm = document.getElementById('verifyForm');
+        const registrationForm = document.getElementById('registrationForm');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        
+        // Show alert
+        function showAlert(message, type = 'danger') {
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = message;
+            alertDiv.style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+        
+        // Hide alert
+        function hideAlert() {
+            alertDiv.style.display = 'none';
+        }
+        
+        // Show step
+        function showStep(stepName) {
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.getElementById(stepName + 'Step').style.display = 'block';
+            
+            // Update step indicators
+            const steps = ['verify', 'registration', 'success'];
+            const stepIndex = steps.indexOf(stepName) + 1;
+            
+            document.querySelectorAll('.step').forEach((el, index) => {
+                const circle = el.querySelector('.step-circle');
+                if (index < stepIndex) {
+                    el.classList.add('active');
+                    circle.style.background = '#4a90e2';
+                    circle.style.color = 'white';
+                } else {
+                    el.classList.remove('active');
+                    circle.style.background = '#e9ecef';
+                    circle.style.color = '#6c757d';
+                }
+            });
+        }
+        
+        // Check token validity
+        async function checkToken() {
+            if (!registrationToken) {
+                showStep('error');
+                return;
+            }
+            
+            try {
+                const response = await API.auth.validateRegistrationToken(registrationToken);
+                if (!response.valid) {
+                    showStep('error');
+                } else {
+                    userEmail = response.email;
+                    if (response.verified) {
+                        // Token already verified, show registration form
+                        document.getElementById('email').value = userEmail;
+                        showStep('registration');
+                    } else {
+                        showStep('verify');
+                    }
+                }
+            } catch (error) {
+                console.error('Token validation error:', error);
+                showStep('error');
+            }
+        }
+        
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            const requirements = {
+                length: password.length >= 8,
+                upper: /[A-Z]/.test(password),
+                lower: /[a-z]/.test(password),
+                number: /\d/.test(password)
+            };
+            
+            // Update UI
+            document.getElementById('lengthReq').style.color = requirements.length ? '#28a745' : '#dc3545';
+            document.getElementById('lengthReq').innerHTML = `<i class="fas fa-${requirements.length ? 'check' : 'times'}-circle"></i> At least 8 characters`;
+            
+            document.getElementById('upperReq').style.color = requirements.upper ? '#28a745' : '#dc3545';
+            document.getElementById('upperReq').innerHTML = `<i class="fas fa-${requirements.upper ? 'check' : 'times'}-circle"></i> One uppercase letter`;
+            
+            document.getElementById('lowerReq').style.color = requirements.lower ? '#28a745' : '#dc3545';
+            document.getElementById('lowerReq').innerHTML = `<i class="fas fa-${requirements.lower ? 'check' : 'times'}-circle"></i> One lowercase letter`;
+            
+            document.getElementById('numberReq').style.color = requirements.number ? '#28a745' : '#dc3545';
+            document.getElementById('numberReq').innerHTML = `<i class="fas fa-${requirements.number ? 'check' : 'times'}-circle"></i> One number`;
+            
+            return requirements.length && requirements.upper && requirements.lower && requirements.number;
+        }
+        
+        // Password visibility toggle
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const icon = button.querySelector('i');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.className = 'fas fa-eye-slash';
+                } else {
+                    input.type = 'password';
+                    icon.className = 'fas fa-eye';
+                }
+            });
+        });
+        
+        // Password strength monitoring
+        passwordInput.addEventListener('input', () => {
+            checkPasswordStrength(passwordInput.value);
+        });
+        
+        // Verify code form
+        if (verifyForm) {
+            verifyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideAlert();
+                
+                const code = document.getElementById('verificationCode').value;
+                const verifyBtn = document.getElementById('verifyBtn');
+                
+                verifyBtn.disabled = true;
+                verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+                
+                try {
+                    const response = await API.auth.verifyRegistrationCode(registrationToken, code);
+                    
+                    if (response.success) {
+                        tempToken = response.tempToken;
+                        userEmail = response.email;
+                        document.getElementById('email').value = userEmail;
+                        showStep('registration');
+                    } else {
+                        showAlert(response.error || 'Invalid verification code');
+                    }
+                } catch (error) {
+                    showAlert('Verification failed. Please try again.');
+                } finally {
+                    verifyBtn.disabled = false;
+                    verifyBtn.innerHTML = 'Verify Code';
+                }
+            });
+        }
+        
+        // Registration form
+        if (registrationForm) {
+            registrationForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideAlert();
+                
+                const formData = new FormData(registrationForm);
+                const password = formData.get('password');
+                const confirmPassword = formData.get('confirmPassword');
+                
+                // Validate password
+                if (!checkPasswordStrength(password)) {
+                    showAlert('Please meet all password requirements');
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    showAlert('Passwords do not match');
+                    return;
+                }
+                
+                const registerBtn = document.getElementById('registerBtn');
+                registerBtn.disabled = true;
+                registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
+                
+                try {
+                    const registrationData = {
+                        tempToken: tempToken,
+                        username: formData.get('username'),
+                        password: password,
+                        name: formData.get('name'),
+                        email: userEmail,
+                        company: formData.get('company'),
+                        phone: formData.get('phone'),
+                        position: formData.get('position')
+                    };
+                    
+                    const response = await API.auth.completeRegistration(registrationData);
+                    
+                    if (response.success || response.message) {
+                        showStep('success');
+                    } else {
+                        showAlert(response.error || 'Registration failed');
+                        registerBtn.disabled = false;
+                        registerBtn.innerHTML = 'Complete Registration';
+                    }
+                } catch (error) {
+                    showAlert('Failed to complete registration. Please try again.');
+                    registerBtn.disabled = false;
+                    registerBtn.innerHTML = 'Complete Registration';
+                }
+            });
+        }
+        
+        // Initialize
+        checkToken();
+    });
+    </script>
+</body>
+</html>

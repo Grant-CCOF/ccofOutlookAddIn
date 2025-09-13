@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Capital Choice</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <img src="https://ccofficefurniture.com/wp-content/uploads/2025/02/Capital-Choice-20th-logo-Final-with-Tag-Blue.svg" 
+                         alt="Capital Choice" 
+                         class="auth-logo">
+                    <h2>Create Account</h2>
+                    <p>Join as an Installation Company</p>
+                </div>
+                
+                <!-- Alert Messages -->
+                <div id="alertMessage" class="alert" style="display: none; margin-bottom: 20px;"></div>
+                
+                <!-- Registration Form -->
+                <form id="registrationForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="email">Business Email Address</label>
+                        <input type="email" 
+                               id="email" 
+                               name="email" 
+                               class="form-control" 
+                               placeholder="your.name@company.com"
+                               required>
+                        <small class="form-text text-muted">
+                            We'll send a verification code to this email
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info" style="margin: 20px 0;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Important:</strong>
+                        <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                            <li>Only installation companies can register through this form</li>
+                            <li>You'll need to provide company information</li>
+                            <li>Admin approval is required before account activation</li>
+                            <li>You'll be notified by email once approved</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">
+                        Send Verification Email
+                    </button>
+                </form>
+                
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="/">Sign In</a></p>
+                    <p>Forgot your password? <a href="/forgot-password.html">Reset Password</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('registrationForm');
+        const alertDiv = document.getElementById('alertMessage');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // Show alert message
+        function showAlert(message, type = 'danger') {
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = message;
+            alertDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    alertDiv.style.display = 'none';
+                }, 10000);
+            }
+        }
+        
+        // Hide alert
+        function hideAlert() {
+            alertDiv.style.display = 'none';
+        }
+        
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideAlert();
+            
+            const email = document.getElementById('email').value.trim();
+            
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('Please enter a valid email address');
+                return;
+            }
+            
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            
+            try {
+                const response = await API.auth.requestRegistration(email);
+                
+                if (response.success) {
+                    showAlert(
+                        `<i class="fas fa-check-circle"></i> ${response.message}<br>
+                        <small>Check your email for the verification code and registration link.</small>`,
+                        'success'
+                    );
+                    
+                    // Clear form
+                    form.reset();
+                    
+                    // Show debug info in development
+                    if (response.debug) {
+                        console.log('Debug info:', response.debug);
+                        showAlert(
+                            `${response.message}<br>
+                            <small><strong>Debug:</strong> Token: ${response.debug.token}<br>
+                            Code: ${response.debug.code}</small>`,
+                            'warning'
+                        );
+                    }
+                } else {
+                    showAlert(response.message || 'Registration request failed');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showAlert('Failed to send registration email. Please try again.');
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Send Verification Email';
+            }
+        });
+    });
+    </script>
+</body>
+</html>
