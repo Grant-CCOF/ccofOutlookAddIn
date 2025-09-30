@@ -106,7 +106,7 @@
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
             
             try {
-                const response = await API.auth.requestRegistration(email);
+                const response = await API.requestRegistration(email);
                 
                 if (response.success) {
                     showAlert(

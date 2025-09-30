@@ -351,95 +351,222 @@ class MicrosoftEmailService {
         }
     }
 
-    async sendProjectCompletionEmail(project, winner) {
+    // In services/microsoftEmailService.js
+    async sendProjectCreationEmail(project, creator) {
         try {
+            // Get all admins
             const admins = await db.all(
-                'SELECT email, name FROM users WHERE role = ? AND approved = 1',
+                'SELECT email, name, role FROM users WHERE role = ? AND approved = 1',
                 ['admin']
             );
             
-            // Get project statistics
-            const stats = await db.get(
-                `SELECT COUNT(*) as total_bids, 
-                        MIN(amount) as min_bid, 
-                        MAX(amount) as max_bid,
-                        AVG(amount) as avg_bid
-                FROM bids WHERE project_id = ?`,
-                [project.id]
+            // Get all approved installers
+            const installers = await db.all(
+                'SELECT email, name, company, role FROM users WHERE role = ? AND approved = 1',
+                ['installation_company']
             );
             
+            // Combine both groups
+            const allRecipients = [
+                ...admins,
+                ...installers
+            ];
+            
+            logger.info(`Sending project creation emails to ${admins.length} admins and ${installers.length} installers`);
+            
             const results = [];
-            for (const admin of admins) {
-                const subject = `Project Completed: ${project.title}`;
-                const html = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <style>
-                            /* Same styles as above */
-                            .success-header {
-                                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                            }
-                            .stats-grid {
-                                display: grid;
-                                grid-template-columns: repeat(2, 1fr);
-                                gap: 15px;
-                                margin: 20px 0;
-                            }
-                            .stat-box {
-                                background: #f8f9fa;
-                                padding: 15px;
-                                border-radius: 8px;
-                                text-align: center;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <div class="header success-header">
-                                <h1>✓ Project Completed</h1>
-                                <p>Project has been successfully completed</p>
-                            </div>
-                            <div class="content">
-                                <h2>${project.title}</h2>
-                                
-                                <div class="info-box">
-                                    <p><strong>Winner:</strong> ${winner.name || winner.company}</p>
-                                    <p><strong>Winning Bid:</strong> $${project.awarded_amount}</p>
-                                    <p><strong>Completion Date:</strong> ${new Date().toLocaleDateString()}</p>
-                                </div>
-                                
-                                <div class="stats-grid">
-                                    <div class="stat-box">
-                                        <h3>${stats.total_bids}</h3>
-                                        <p>Total Bids</p>
-                                    </div>
-                                    <div class="stat-box">
-                                        <h3>$${Math.round(stats.avg_bid)}</h3>
-                                        <p>Average Bid</p>
-                                    </div>
-                                </div>
-                                
-                                <center>
-                                    <a href="${process.env.APP_URL}/#/projects/${project.id}" class="button">
-                                        View Project Summary
-                                    </a>
-                                </center>
-                            </div>
-                        </div>
-                    </body>
-                    </html>
-                `;
-                
-                const result = await this.sendEmail(admin.email, subject, html);
-                results.push(result);
+            let successCount = 0;
+            let failureCount = 0;
+            
+            // Send individual email to each recipient
+            for (const recipient of allRecipients) {
+                try {
+                    const subject = `New Project Available: ${project.title}`;
+                    
+                    // Customize content based on role
+                    const isAdmin = recipient.role === 'admin';
+                    const html = this.getProjectCreationEmailHtml(project, creator, recipient, isAdmin);
+                    
+                    const result = await this.sendEmail(recipient.email, subject, html);
+                    
+                    if (result.success) {
+                        successCount++;
+                        logger.info(`Email sent to ${recipient.email}`);
+                    } else {
+                        failureCount++;
+                        logger.error(`Failed to send email to ${recipient.email}`);
+                    }
+                    
+                    results.push({
+                        email: recipient.email,
+                        role: recipient.role,
+                        ...result
+                    });
+                    
+                    // Add small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                } catch (error) {
+                    failureCount++;
+                    logger.error(`Error sending email to ${recipient.email}:`, error);
+                    results.push({
+                        email: recipient.email,
+                        role: recipient.role,
+                        success: false,
+                        error: error.message
+                    });
+                }
             }
             
-            return { success: true, results };
+            logger.info(`Project creation emails sent: ${successCount} successful, ${failureCount} failed`);
+            
+            return { 
+                success: failureCount === 0, 
+                results,
+                summary: {
+                    total: allRecipients.length,
+                    successful: successCount,
+                    failed: failureCount,
+                    adminCount: admins.length,
+                    installerCount: installers.length
+                }
+            };
+            
         } catch (error) {
-            logger.error('Error sending completion emails:', error);
+            logger.error('Error sending project creation emails:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    // Separate method for HTML generation with role-based customization
+    getProjectCreationEmailHtml(project, creator, recipient, isAdmin) {
+        const greeting = isAdmin ? 
+            `Hello ${recipient.name || 'Admin'},` : 
+            `Hello ${recipient.name || recipient.company || 'Installer'},`;
+        
+        const introduction = isAdmin ?
+            'A new project has been added to the platform and requires your attention.' :
+            'A new project opportunity is now available for bidding!';
+        
+        const callToAction = isAdmin ?
+            'Review Project Details' :
+            'Submit Your Bid';
+        
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { 
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                        line-height: 1.6;
+                        color: #1d1d1f;
+                        background: #f5f5f7;
+                    }
+                    .container { 
+                        max-width: 600px; 
+                        margin: 40px auto; 
+                        background: white;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    }
+                    .header { 
+                        background: linear-gradient(135deg, ${isAdmin ? '#007bff' : '#28a745'} 0%, ${isAdmin ? '#0056b3' : '#20c997'} 100%);
+                        color: white; 
+                        padding: 30px; 
+                        text-align: center;
+                        border-radius: 12px 12px 0 0;
+                    }
+                    .content { 
+                        padding: 30px;
+                    }
+                    .info-box {
+                        background: #f8f9fa;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                    }
+                    .button { 
+                        display: inline-block;
+                        background: ${isAdmin ? '#007bff' : '#28a745'}; 
+                        color: white; 
+                        padding: 12px 30px; 
+                        text-decoration: none; 
+                        border-radius: 25px;
+                        font-weight: 500;
+                        margin: 20px 0;
+                    }
+                    .button:hover {
+                        opacity: 0.9;
+                    }
+                    ${!isAdmin ? `
+                    .urgency-banner {
+                        background: #fff3cd;
+                        border: 1px solid #ffc107;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                        text-align: center;
+                    }
+                    .bid-deadline {
+                        color: #dc3545;
+                        font-weight: bold;
+                        font-size: 18px;
+                    }
+                    ` : ''}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>${isAdmin ? 'New Project Created' : ' New Project Opportunity'}</h1>
+                        <p>${isAdmin ? 'Administrative Notification' : 'Open for Bidding'}</p>
+                    </div>
+                    <div class="content">
+                        <p>${greeting}</p>
+                        <p>${introduction}</p>
+                        
+                        <h2>${project.title}</h2>
+                        
+                        <div class="info-box">
+                            ${isAdmin ? `<p><strong>Created by:</strong> ${creator.name || creator.username}</p>` : ''}
+                            <p><strong>Delivery Date:</strong> ${new Date(project.delivery_date).toLocaleDateString()}</p>
+                            <p><strong>Location:</strong> ${project.zip_code}</p>
+                            ${project.show_max_bid ? `<p><strong>Budget Range:</strong> Up to $${project.max_bid}</p>` : ''}
+                            <p><strong>Bid Due Date:</strong> ${new Date(project.bid_due_date).toLocaleDateString()}</p>
+                        </div>
+                        
+                        ${!isAdmin ? `
+                        <div class="urgency-banner">
+                            <p class="bid-deadline">Bidding Deadline: ${new Date(project.bid_due_date).toLocaleDateString()}</p>
+                            <p>Don't miss this opportunity!</p>
+                        </div>
+                        ` : ''}
+                        
+                        <p><strong>Project Description:</strong></p>
+                        <p>${project.description}</p>
+                        
+                        ${project.site_conditions ? `
+                        <p><strong>Site Conditions:</strong></p>
+                        <p>${project.site_conditions}</p>
+                        ` : ''}
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/projects/${project.id}" class="button">
+                                ${callToAction}
+                            </a>
+                        </center>
+                        
+                        ${!isAdmin ? `
+                        <p style="text-align: center; color: #6c757d; font-size: 14px;">
+                            You are receiving this email because you are a registered installer on the Capital Choice Bid Platform.
+                        </p>
+                        ` : ''}
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
     }
 
     async sendBidClosingEmail(project, stats) {

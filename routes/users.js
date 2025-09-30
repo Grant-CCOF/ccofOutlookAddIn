@@ -7,6 +7,7 @@ const BidModel = require('../models/bid');
 const RatingModel = require('../models/rating');
 const AuthService = require('../services/authService');
 const emailService = require('../services/emailService');
+const NotificationService = require('../services/notificationService');
 const RegistrationService = require('../services/registrationService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -235,7 +236,7 @@ router.put('/:id/approve', [
             }
         }
         
-        // Create notification
+        /* Create notification
         await NotificationService.create({
             user_id: userId,
             title: 'Account Approved',
@@ -245,7 +246,7 @@ router.put('/:id/approve', [
                 approved_by: req.user.id,
                 approved_at: new Date().toISOString() 
             })
-        });
+        }); */
         
         logger.info(`User ${userId} approved by admin ${req.user.id}`);
         

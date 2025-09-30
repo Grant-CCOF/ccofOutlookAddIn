@@ -6,6 +6,69 @@
     <title>Complete Registration - Capital Choice</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Fix scrolling issues */
+        .auth-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;  /* Ensure vertical scrolling */
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        }
+        
+        .auth-container {
+            min-height: 100vh; /* Ensure container is at least viewport height */
+            padding: 20px;
+            display: flex;
+            align-items: flex-start; /* Changed from center to flex-start */
+            padding-top: 40px; /* Add some top padding */
+            padding-bottom: 40px; /* Add some bottom padding */
+        }
+        
+        .auth-card {
+            width: 100%;
+            max-height: none; /* Remove any height restrictions */
+            margin: 0 auto;
+        }
+        
+        /* On smaller screens, reduce padding */
+        @media (max-width: 768px) {
+            .auth-card {
+                padding: 24px;
+            }
+            
+            .auth-container {
+                padding: 10px;
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
+            
+            /* Make form responsive */
+            .row {
+                display: block;
+            }
+            
+            .col-md-6 {
+                width: 100%;
+                margin-bottom: 15px;
+            }
+        }
+        
+        /* Ensure form content is visible */
+        #registrationStep {
+            max-height: none;
+            overflow: visible;
+        }
+        
+        /* Fix for iOS Safari */
+        body {
+            position: relative;
+            height: 100%;
+        }
+    </style>
 </head>
 <body>
     <div class="auth-page">
@@ -313,7 +376,7 @@
             }
             
             try {
-                const response = await API.auth.validateRegistrationToken(registrationToken);
+                const response = await API.validateRegistrationToken(registrationToken);
                 if (!response.valid) {
                     showStep('error');
                 } else {
@@ -392,7 +455,7 @@
                 verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
                 
                 try {
-                    const response = await API.auth.verifyRegistrationCode(registrationToken, code);
+                    const response = await API.verifyRegistrationCode(registrationToken, code);
                     
                     if (response.success) {
                         tempToken = response.tempToken;
@@ -448,7 +511,7 @@
                         position: formData.get('position')
                     };
                     
-                    const response = await API.auth.completeRegistration(registrationData);
+                    const response = await API.completeRegistration(registrationData);
                     
                     if (response.success || response.message) {
                         showStep('success');

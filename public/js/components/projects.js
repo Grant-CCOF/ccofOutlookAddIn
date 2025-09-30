@@ -288,6 +288,10 @@ const ProjectsComponent = {
                 <div class="project-card-footer">
                     <div class="project-card-meta">
                         <i class="fas fa-user"></i> ${project.project_manager_name || 'Unknown'}
+                        ${project.project_manager_email ? `
+                            <span class="mx-2">•</span>
+                            <i class="fas fa-envelope"></i> ${project.project_manager_email}
+                        ` : ''}
                     </div>
                     
                     <div class="project-card-actions">
@@ -479,6 +483,7 @@ const ProjectsComponent = {
                                     </span>
                                     <span class="text-muted ml-3">
                                         <i class="fas fa-user"></i> ${project.project_manager_name}
+                                        ${project.project_manager_email ? ` (${project.project_manager_email})` : ''}
                                     </span>
                                     <span class="text-muted ml-3">
                                         <i class="fas fa-calendar"></i> Created ${Formatter.datetime(project.created_at)}

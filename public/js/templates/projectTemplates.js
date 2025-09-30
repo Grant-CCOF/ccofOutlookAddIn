@@ -21,6 +21,9 @@ const ProjectTemplates = {
                 
                 <div class="project-card-body">
                     <div class="project-meta">
+                        <span><i class="fas fa-user"></i> ${project.project_manager_name || 'Unknown'}
+                            ${project.project_manager_email ? ` • ${project.project_manager_email}` : ''}
+                        </span>
                         <span><i class="fas fa-map-marker-alt"></i> ${project.zip_code}</span>
                         <span><i class="fas fa-calendar"></i> Due ${Formatter.datetime(project.bid_due_date)}</span>
                         <span><i class="fas fa-truck"></i> Delivery ${Formatter.datetime(project.delivery_date)}</span>

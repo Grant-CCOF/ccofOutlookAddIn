@@ -471,10 +471,6 @@ const ProfileComponent = {
                         <h4>${stats.won_bids || 0}</h4>
                         <small>Won</small>
                     </div>
-                    <div class="col-4">
-                        <h4>${stats.win_rate || 0}%</h4>
-                        <small>Win Rate</small>
-                    </div>
                 </div>
             `;
         }

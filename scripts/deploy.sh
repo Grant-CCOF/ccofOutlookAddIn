@@ -755,7 +755,8 @@ configure_nginx() {
         cp "$NGINX_CONF" /etc/nginx/sites-available/$APP_NAME
         
         # Replace placeholders
-        sed -i "s|your-domain.com|${DOMAIN:-'_'}|g" /etc/nginx/sites-available/$APP_NAME
+        sed -i "s|your-domain.com|${DOMAIN}|g" /etc/nginx/sites-available/$APP_NAME
+        sed -i "s|\${DOMAIN:-'_'}|${DOMAIN}|g" /etc/nginx/sites-available/$APP_NAME
         sed -i "s|/opt/capital-choice-platform|$APP_DIR|g" /etc/nginx/sites-available/$APP_NAME
         
         print_success "Using complete nginx configuration from file"

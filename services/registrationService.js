@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const db = require('../models/database');
 const RegistrationTokenModel = require('../models/registrationToken');
 const UserModel = require('../models/user');
 const microsoftEmailService = require('./microsoftEmailService');
@@ -273,13 +274,13 @@ Capital Choice Office Furniture
                 return { success: false, error: 'Email mismatch' };
             }
             
-            // Check if username already exists
+            // Check if username already exists (active)
             const existingUsername = await UserModel.getByUsername(registrationData.username);
             if (existingUsername) {
                 return { success: false, error: 'Username already taken' };
             }
             
-            // Check if email already exists (double check)
+            // Check if email already exists (active)
             const existingEmail = await UserModel.getByEmail(registrationData.email);
             if (existingEmail) {
                 return { success: false, error: 'Email already registered' };
@@ -288,52 +289,60 @@ Capital Choice Office Furniture
             // Hash password
             const hashedPassword = await bcrypt.hash(registrationData.password, 10);
             
-            // Create user (not approved yet)
+            // Create user (handles reactivation automatically)
             const userId = await UserModel.create({
                 username: registrationData.username,
                 password: hashedPassword,
                 name: registrationData.name,
                 email: registrationData.email,
-                role: 'installation_company', // Always installation company for this flow
+                role: 'installation_company',
                 company: registrationData.company,
                 phone: registrationData.phone,
                 position: registrationData.position,
-                approved: 0, // Requires admin approval
+                approved: 0,
                 suspended: 0
             });
             
             // Mark registration as completed
             await RegistrationTokenModel.markAsCompleted(regToken.id);
             
-            // Get the created user
+            // Get the created/reactivated user
             const newUser = await UserModel.getById(userId);
             
-            // Notify admins
-            await this.notifyAdminsOfNewRegistration(newUser);
+            // Check if this was a reactivation
+            const wasReactivated = newUser.updated_at !== newUser.created_at;
             
-            logger.info(`New installation company registered: ${registrationData.username} (${registrationData.email})`);
+            // Notify admins
+            await this.notifyAdminsOfNewRegistration(newUser, wasReactivated);
+            
+            logger.info(`${wasReactivated ? 'Reactivated' : 'New'} installation company: ${registrationData.username}`);
             
             return { 
                 success: true, 
-                message: 'Registration successful! Your account is pending admin approval. You will receive an email once approved.' 
+                message: wasReactivated 
+                    ? 'Account reactivated successfully! Please wait for admin approval.'
+                    : 'Registration successful! Please wait for admin approval.'
             };
             
         } catch (error) {
             logger.error('Registration completion error:', error);
-            return { success: false, error: 'Failed to complete registration' };
+            return { success: false, error: error.message || 'Registration failed' };
         }
     }
     
     // Notify all admins of new registration
-    static async notifyAdminsOfNewRegistration(user) {
+    static async notifyAdminsOfNewRegistration(user, wasReactivated = false) {
         try {
             // Get all admin users
-            const admins = await UserModel.db.all(
+            const admins = await db.all(
                 'SELECT * FROM users WHERE role = ? AND approved = 1 AND suspended = 0',
                 ['admin']
             );
             
-            const subject = 'New Installation Company Registration - Approval Required';
+            const actionType = wasReactivated ? 'reactivated' : 'registered';
+            const subject = wasReactivated 
+            ? 'Account Reactivation Requires Approval'
+            : 'New Registration Requires Approval';
             
             const htmlContent = `
                 <!DOCTYPE html>
@@ -385,7 +394,7 @@ Capital Choice Office Furniture
                             <h2>New Registration Pending Approval</h2>
                         </div>
                         <div class="content">
-                            <p>A new installation company has registered and requires admin approval.</p>
+                            <p>A new installation company has ${actionType} and requires admin approval.</p>
                             
                             <div class="info-box">
                                 <h3>Registration Details:</h3>

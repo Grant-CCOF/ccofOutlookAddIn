@@ -169,23 +169,43 @@ const ProjectModals = {
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>Bid Due Date <span class="text-danger">*</span></label>
-                            <input type="datetime-local" 
-                                class="form-control" 
-                                name="bid_due_date" 
-                                id="bidDueDate"
-                                value="${project ? this.formatDateForInput(project.bid_due_date) : ''}"
-                                required>
+                            <div class="row">
+                                <div class="col-md-7">
+                                    <input type="date" 
+                                        class="form-control" 
+                                        name="bid_due_date_date" 
+                                        id="bidDueDate"
+                                        value="${project ? project.bid_due_date.split('T')[0] : ''}"
+                                        required>
+                                </div>
+                                <div class="col-md-5">
+                                    <select class="form-control" name="bid_due_time" required>
+                                        <option value="">Select Time</option>
+                                        ${this.generateTimeOptions(project?.bid_due_date)}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>Delivery Date <span class="text-danger">*</span></label>
-                            <input type="datetime-local" 
-                                class="form-control" 
-                                name="delivery_date" 
-                                id="deliveryDate"
-                                value="${project ? this.formatDateForInput(project.delivery_date) : ''}"
-                                required>
+                            <div class="row">
+                                <div class="col-md-7">
+                                    <input type="date" 
+                                        class="form-control" 
+                                        name="delivery_date_date" 
+                                        id="deliveryDate"
+                                        value="${project ? project.delivery_date.split('T')[0] : ''}"
+                                        required>
+                                </div>
+                                <div class="col-md-5">
+                                    <select class="form-control" name="delivery_time" required>
+                                        <option value="">Select Time</option>
+                                        ${this.generateTimeOptions(project?.delivery_date)}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -270,6 +290,34 @@ const ProjectModals = {
                 ` : ''}
             </form>
         `;
+    },
+
+    generateTimeOptions(existingDateTime = null) {
+        let options = '';
+        let selectedTime = '';
+        
+        if (existingDateTime) {
+            const date = new Date(existingDateTime);
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            selectedTime = `${hours}:${minutes}`;
+        }
+        
+        for (let hour = 0; hour < 24; hour++) {
+            for (let minute of [0, 30]) {
+                const h = hour.toString().padStart(2, '0');
+                const m = minute.toString().padStart(2, '0');
+                const time24 = `${h}:${m}`;
+                const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                const ampm = hour < 12 ? 'AM' : 'PM';
+                const display = `${hour12}:${m} ${ampm}`;
+                const selected = time24 === selectedTime ? 'selected' : '';
+                
+                options += `<option value="${time24}" ${selected}>${display}</option>`;
+            }
+        }
+        
+        return options;
     },
 
     toggleBiddingWarning(checkbox) {
@@ -651,6 +699,19 @@ const ProjectModals = {
             data.max_bid = parseFloat(data.max_bid);
         } else {
             data.max_bid = null;  // Send null instead of deleting
+        }
+
+        // Combine date and time fields
+        if (data.bid_due_date_date && data.bid_due_time) {
+            data.bid_due_date = `${data.bid_due_date_date}T${data.bid_due_time}:00`;
+            delete data.bid_due_date_date;
+            delete data.bid_due_time;
+        }
+        
+        if (data.delivery_date_date && data.delivery_time) {
+            data.delivery_date = `${data.delivery_date_date}T${data.delivery_time}:00`;
+            delete data.delivery_date_date;
+            delete data.delivery_time;
         }
         
         // Ensure dates are properly formatted

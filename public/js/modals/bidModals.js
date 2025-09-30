@@ -116,7 +116,8 @@ const BidModals = {
                            class="form-control" 
                            name="alternate_delivery_date"
                            value="${bid?.alternate_delivery_date?.split('T')[0] || ''}"
-                           min="${new Date().toISOString().split('T')[0]}">
+                           min="${new Date().toISOString().split('T')[0]}"
+                           step="900">
                     <small class="form-text text-muted">
                         Leave blank to use project's delivery date: ${Formatter.date(project.delivery_date)}
                     </small>

@@ -75,12 +75,13 @@ router.post('/register', [
     try {
         const { username, password, name, email, role, company, phone, position } = req.body;
         
-        // Check if user already exists
+        // Check for existing active username
         const existingUser = await UserModel.getByUsername(username);
         if (existingUser) {
             return res.status(409).json({ error: 'Username already exists' });
         }
         
+        // Check for existing active email
         const existingEmail = await UserModel.getByEmail(email);
         if (existingEmail) {
             return res.status(409).json({ error: 'Email already registered' });
@@ -89,7 +90,7 @@ router.post('/register', [
         // Hash password
         const hashedPassword = await AuthService.hashPassword(password);
         
-        // Create user
+        // Create user (handles reactivation internally)
         const userId = await UserModel.create({
             username,
             password: hashedPassword,
@@ -99,24 +100,30 @@ router.post('/register', [
             company,
             phone,
             position,
-            approved: 0, // Require admin approval
+            approved: 0,
             suspended: 0
         });
         
-        // Get created user
+        // Get created/reactivated user
         const user = await UserModel.getById(userId);
         
-        // Send welcome email
-        // await emailService.sendWelcomeEmail(user);
-        
-        logger.info(`New user registered: ${username} (${email})`);
+        logger.info(`User registered/reactivated: ${username} (${email})`);
         
         res.status(201).json({
             message: 'Registration successful. Please wait for admin approval.',
-            userId
+            userId: user.id
         });
     } catch (error) {
         logger.error('Registration error:', error);
+        
+        // Handle specific errors
+        if (error.message === 'Username already in use') {
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+        if (error.message === 'Email already registered') {
+            return res.status(409).json({ error: 'Email already in use' });
+        }
+        
         res.status(500).json({ error: 'Registration failed' });
     }
 });

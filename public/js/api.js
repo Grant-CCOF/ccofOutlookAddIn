@@ -124,10 +124,12 @@ const API = {
             'Accept': 'application/json'
         };
         
-        // Add auth token if available
-        const token = Auth.getToken();
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        // Add auth token if available and Auth is defined
+        if (typeof Auth !== 'undefined' && Auth.getToken) {
+            const token = Auth.getToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
         }
         
         return headers;
@@ -263,33 +265,23 @@ const API = {
         Config.log('Cancelling all pending requests');
     },
 
-    // Request registration (send email)
     async requestRegistration(email) {
-        return this.request('/api/auth/request-registration', {
-            method: 'POST',
-            body: JSON.stringify({ email })
-        });
+        return this.post('/auth/request-registration', { email });
     },
 
     // Verify registration code
     async verifyRegistrationCode(token, code) {
-        return this.request('/api/auth/verify-registration-code', {
-            method: 'POST',
-            body: JSON.stringify({ token, code })
-        });
+        return this.post('/auth/verify-registration-code', { token, code });
     },
 
     // Complete registration
     async completeRegistration(data) {
-        return this.request('/api/auth/complete-registration', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
+        return this.post('/auth/complete-registration', data);
     },
 
     // Validate registration token
     async validateRegistrationToken(token) {
-        return this.request(`/api/auth/validate-registration-token?token=${encodeURIComponent(token)}`);
+        return this.get('/auth/validate-registration-token', { token });
     }
 };
 
@@ -339,7 +331,7 @@ API.users = {
     create: (data) => API.post('/users/create', data),
     update: (id, data) => API.put(`/users/${id}`, data),
     delete: (id) => API.delete(`/users/${id}`),
-    approve: (id) => API.post(`/users/${id}/approve`),
+    approve: (id) => API.put(`/users/${id}/approve`),
     suspend: (id, reason) => API.post(`/users/${id}/suspend`, { reason }),
     unsuspend: (id) => API.post(`/users/${id}/unsuspend`),
     changeRole: (id, role) => API.post(`/users/${id}/change-role`, { role }),

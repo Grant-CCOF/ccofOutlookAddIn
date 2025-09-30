@@ -275,12 +275,13 @@ class Database {
                 // Check if admin exists by username OR email
                 const adminCheck = await this.get(
                     'SELECT id, username, email FROM users WHERE username = ? OR email = ?', 
-                    ['admin', 'admin@capitalchoice.com']
+                    ['admin', 'grant@ccofficefurniture.com']
                 );
                 
                 if (!adminCheck) {
                     logger.info('No admin user found, creating default admin...');
                     
+                    const passwordDisplay = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
                     const hashedPassword = await bcrypt.hash(
                         process.env.DEFAULT_ADMIN_PASSWORD || 'admin123', 
                         10
@@ -289,11 +290,11 @@ class Database {
                     await this.run(
                         `INSERT INTO users (username, password, name, email, role, approved, suspended) 
                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                        ['admin', hashedPassword, 'System Administrator', 'admin@capitalchoice.com', 'admin', 1, 0]
+                        ['admin', hashedPassword, 'System Administrator', 'grant@ccofficefurniture.com', 'admin', 1, 0]
                     );
                     
                     logger.info('Default admin user created successfully');
-                    logger.info('Login with username: admin, password: admin123');
+                    logger.info(`Login with username: admin, password: ${passwordDisplay}`);
                 } else {
                     logger.info(`Admin user already exists (username: ${adminCheck.username}, email: ${adminCheck.email})`);
                 }

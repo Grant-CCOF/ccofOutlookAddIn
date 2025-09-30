@@ -2,44 +2,172 @@ const db = require('./database');
 const logger = require('../utils/logger');
 
 class UserModel {
+    // Modified create method with re-registration support
     static async create(userData) {
+        try {
+            // First check if email exists (including soft-deleted)
+            const existingByEmail = await this.getByEmailIncludingDeleted(userData.email);
+            
+            // If email exists and is NOT soft-deleted, it's a conflict
+            if (existingByEmail && !existingByEmail.deleted_at) {
+                logger.error(`Email already in use by active user: ${userData.email}`);
+                throw new Error('Email already registered');
+            }
+            
+            // If email exists and IS soft-deleted, we'll reactivate
+            if (existingByEmail && existingByEmail.deleted_at) {
+                logger.info(`Found soft-deleted user with email: ${userData.email}, attempting reactivation`);
+                
+                // Check if the requested username is available
+                const usernameCheck = await this.getByUsernameIncludingDeleted(userData.username);
+                
+                // Username conflict scenarios:
+                // 1. Username belongs to a different active user -> conflict
+                // 2. Username belongs to a different soft-deleted user -> conflict
+                // 3. Username belongs to this same soft-deleted user -> OK to reuse
+                // 4. Username doesn't exist -> OK to use
+                
+                if (usernameCheck && !usernameCheck.deleted_at && usernameCheck.id !== existingByEmail.id) {
+                    // Username is in use by another active user
+                    logger.error(`Username ${userData.username} already in use by active user`);
+                    throw new Error('Username already exists');
+                }
+                
+                if (usernameCheck && usernameCheck.deleted_at && usernameCheck.id !== existingByEmail.id) {
+                    // Username belongs to a different soft-deleted user
+                    logger.error(`Username ${userData.username} already in use by another user`);
+                    throw new Error('Username already exists');
+                }
+                
+                // If we get here, username is either:
+                // - Available (doesn't exist)
+                // - Belongs to the same soft-deleted user we're reactivating
+                
+                // Reactivate with new data
+                return await this.reactivate(existingByEmail.id, userData);
+            }
+            
+            // No email conflict, check username for new user creation
+            const existingByUsername = await this.getByUsernameIncludingDeleted(userData.username);
+            
+            if (existingByUsername && !existingByUsername.deleted_at) {
+                logger.error(`Username already in use: ${userData.username}`);
+                throw new Error('Username already exists');
+            }
+            
+            // All clear - create new user
+            const sql = `
+                INSERT INTO users (username, password, name, email, role, company, phone, position, approved, suspended)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const params = [
+                userData.username,
+                userData.password,
+                userData.name,
+                userData.email,
+                userData.role,
+                userData.company || null,
+                userData.phone || null,
+                userData.position || null,
+                userData.approved || 0,
+                userData.suspended || 0
+            ];
+            
+            const result = await db.run(sql, params);
+            logger.info(`New user created: ${userData.username} (${userData.email})`);
+            return result.id;
+            
+        } catch (error) {
+            logger.error('Error creating/reactivating user:', error);
+            logger.error('Stack trace:', error.stack);
+            throw error;
+        }
+    }
+
+    // Check if a user exists (including soft-deleted)
+    static async getByEmailIncludingDeleted(email) {
+        const sql = `SELECT * FROM users WHERE email = ?`;
+        return db.get(sql, [email]);
+    }
+    
+    static async getByUsernameIncludingDeleted(username) {
+        const sql = `SELECT * FROM users WHERE username = ?`;
+        return db.get(sql, [username]);
+    }
+
+    // Generate a unique username variant if the original is taken
+    static async generateUniqueUsername(baseUsername) {
+        let username = baseUsername;
+        let counter = 1;
+        
+        while (true) {
+            const existing = await this.getByUsernameIncludingDeleted(username);
+            if (!existing || existing.deleted_at) {
+                // Username is available or belongs to a deleted user
+                return username;
+            }
+            counter++;
+            username = `${baseUsername}${counter}`;
+        }
+    }
+    
+    // Reactivate a soft-deleted user with new data
+    static async reactivate(userId, userData) {
         const sql = `
-            INSERT INTO users (username, password, name, email, role, company, phone, position, approved, suspended)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            UPDATE users SET 
+                username = ?,
+                password = ?,
+                name = ?,
+                role = ?,
+                company = ?,
+                phone = ?,
+                position = ?,
+                approved = ?,
+                suspended = ?,
+                deleted_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
         `;
         
         const params = [
             userData.username,
             userData.password,
             userData.name,
-            userData.email,
             userData.role,
             userData.company || null,
             userData.phone || null,
             userData.position || null,
             userData.approved || 0,
-            userData.suspended || 0
+            userData.suspended || 0,
+            userId
         ];
         
         try {
-            const result = await db.run(sql, params);
-            return result.id;
+            await db.run(sql, params);
+            logger.info(`User reactivated: ID ${userId} with username ${userData.username}`);
+            return userId;
         } catch (error) {
-            logger.error('Error creating user:', error);
+            logger.error('Error reactivating user:', error);
             throw error;
         }
+    }
+
+    static async getByIdIncludingDeleted(id) {
+        const sql = `SELECT * FROM users WHERE id = ?`;
+        return db.get(sql, [id]);
     }
     
     static async getById(userId) {
         try {
-            const result = await database.query(
-                `SELECT id, username, name, email, role, company, created_at, updated_at 
+            const result = await db.get(
+                `SELECT id, username, name, email, role, company, created_at, updated_at, approved, suspended
                 FROM users 
                 WHERE id = ?`,
                 [userId]
             );
             
-            return result[0] || null;
+            return result || null;
         } catch (error) {
             logger.error('Error fetching user by ID:', error);
             throw error;
