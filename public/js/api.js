@@ -106,7 +106,7 @@ const API = {
             clearTimeout(timeoutId);
             
             // Handle response
-            return this.handleResponse(response);
+            return this.handleResponse(response, url);
         } catch (error) {
             if (error.name === 'AbortError') {
                 throw new Error('Request timeout');
@@ -136,11 +136,33 @@ const API = {
     },
     
     // Handle API response
-    async handleResponse(response) {
+    async handleResponse(response, url = '', isLoginRequest = false) {
         // Check if response is ok
         if (!response.ok) {
             // Handle specific error codes
             if (response.status === 401) {
+                // Check if this is a login or registration request
+                const isAuthRequest = url.includes('/auth/login') || 
+                                    url.includes('/auth/register') ||
+                                    url.includes('/auth/forgot-password') ||
+                                    url.includes('/auth/reset-password');
+                
+                if (isAuthRequest) {
+                    // For auth requests, don't trigger logout
+                    try {
+                        const errorData = await response.json();
+                        const errorMessage = errorData.error || 
+                                            errorData.message || 
+                                            'Invalid username or password';
+                        throw new Error(errorMessage);
+                    } catch (parseError) {
+                        if (parseError instanceof Error && parseError.message) {
+                            throw parseError;
+                        }
+                        throw new Error('Invalid username or password');
+                    }
+                }
+
                 // Unauthorized - try to refresh token
                 const refreshed = await Auth.refreshToken();
                 if (!refreshed) {
@@ -287,7 +309,16 @@ const API = {
 
 // API endpoint shortcuts
 API.auth = {
-    login: (username, password) => API.post('/auth/login', { username, password }),
+    login: (username, password) => {
+        // Mark this as a login request to handle 401 differently
+        return API.post('/auth/login', { username, password }).then(async response => {
+            // For login requests, handle response with special flag
+            if (response && response.ok === false) {
+                return API.handleResponse(response, '/auth/login', true);
+            }
+            return response;
+        });
+    },
     logout: () => API.post('/auth/logout'),
     register: (data) => API.post('/auth/register', data),
     refresh: (refreshToken) => API.post('/auth/refresh', { refreshToken }),

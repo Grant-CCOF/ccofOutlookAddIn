@@ -2827,3 +2827,43 @@ button[disabled]:hover::before {
         transform: translateY(0);
     }
 }
+
+/* Login error message styling */
+#loginErrorContainer {
+    margin-bottom: 15px;
+}
+
+#loginErrorContainer .alert {
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-size: 14px;
+}
+
+#loginErrorContainer .alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+#loginErrorContainer .alert i {
+    margin-right: 8px;
+}
+
+/* Inline password error */
+#passwordError {
+    display: block;
+    margin-top: 5px;
+    font-size: 13px;
+    color: #dc3545;
+}
+
+/* Input validation states */
+.form-control.is-invalid {
+    border-color: #dc3545;
+    padding-right: calc(1.5em + 0.75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3e%3ccircle cx='6' cy='6' r='4.5' fill='%23dc3545'/%3e%3cpath stroke='%23fff' stroke-width='2' d='M6 3.5v3M6 8.5h.01'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(0.375em + 0.1875rem) center;
+    background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}

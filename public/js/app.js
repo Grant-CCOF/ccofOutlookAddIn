@@ -252,6 +252,7 @@ const App = {
     async handleLogin(username, password, remember = false) {
         try {
             this.showLoading(true);
+            this.clearLoginErrors();
             
             // Attempt login
             const result = await Auth.login(username, password, remember);
@@ -265,15 +266,58 @@ const App = {
                 return { success: true };
             } else {
                 this.showError(result.message || 'Login failed');
+                this.showLoginError(result.message || 'Invalid username or password');
                 return { success: false, message: result.message };
             }
             
         } catch (error) {
             console.error('Login error:', error);
-            this.showError(error.message || 'Login failed');
+            // Show user-friendly error message
+            let errorMessage = 'Invalid username or password';
+            if (error.message && !error.message.includes('Session expired')) {
+                errorMessage = error.message;
+            }
+            this.showLoginError(errorMessage);
             return { success: false, message: error.message };
         } finally {
             this.showLoading(false);
+        }
+    },
+
+    showLoginError(message) {
+        // Show error in the alert container
+        const errorContainer = DOM.get('loginErrorContainer');
+        const errorMessage = DOM.get('loginErrorMessage');
+        if (errorContainer && errorMessage) {
+            errorMessage.textContent = message;
+            errorContainer.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                this.clearLoginErrors();
+            }, 5000);
+        }
+        
+        // Optional: Also show inline error below password
+        const passwordError = DOM.get('passwordError');
+        if (passwordError) {
+            passwordError.textContent = message;
+            passwordError.style.display = 'block';
+        }
+        
+        // Clear password field for security
+        DOM.setValue('loginPassword', '');
+        DOM.get('loginPassword').focus();
+    },
+
+    clearLoginErrors() {
+        const errorContainer = DOM.get('loginErrorContainer');
+        if (errorContainer) {
+            errorContainer.style.display = 'none';
+        }
+        const passwordError = DOM.get('passwordError');
+        if (passwordError) {
+            passwordError.style.display = 'none';
         }
     },
     

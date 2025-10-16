@@ -762,17 +762,17 @@ const BidsComponent = {
     // Render bid detail
     async renderDetail(bidId) {
         try {
-            App.showLoading(true);
+            if (!window.BidDetailModal || !window.BidDetailModal.showBidDetail) {
+                console.error('BidDetailModal not available');
+                App.showError('Unable to load bid details');
+                return;
+            }
             
-            // Load bid details
-            // Implementation for bid detail view
-            
-            App.showError('Bid detail view not implemented');
-            Router.navigate('/bids');
+            // Show the bid detail modal (same as when clicking from project details)
+            await window.BidDetailModal.showBidDetail(bidId);
             
         } catch (error) {
             Config.error('Failed to load bid details:', error);
-            Router.navigate('/bids');
         } finally {
             App.showLoading(false);
         }

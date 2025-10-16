@@ -49,7 +49,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// Get admin statistics (simplified to use only existing methods)
+// Get admin statistics
 async function getAdminStats() {
     try {
         return {
@@ -59,9 +59,8 @@ async function getAdminStats() {
             activeProjects: await ProjectModel.getCountByStatus('bidding'),
             completedProjects: await ProjectModel.getCountByStatus('completed'),
             totalBids: await BidModel.getCount(),
-            // Simplified stats - using placeholder values for missing methods
-            newUsersThisMonth: 0, // TODO: Implement UserModel.getGrowthByPeriod(30)
-            newProjectsThisMonth: 0, // TODO: Implement ProjectModel.getCountByPeriod(30)
+            newUsersThisMonth: await UserModel.getGrowthByPeriod(30),
+            newProjectsThisMonth: await ProjectModel.getCountByPeriod(30),
             usersByRole: {
                 admin: await UserModel.getCountByRole('admin'),
                 project_manager: await UserModel.getCountByRole('project_manager'),
@@ -75,20 +74,28 @@ async function getAdminStats() {
     }
 }
 
-// Get project manager statistics (simplified)
+// Get project manager statistics - FIXED to use actual methods
 async function getProjectManagerStats(userId) {
     try {
-        // For now, return simplified stats since many methods don't exist yet
+        const totalProjects = await ProjectModel.getCountByManager(userId);
+        const completedProjects = await ProjectModel.getCountByManagerAndStatus(userId, 'completed');
+        const completionRate = await ProjectModel.getCompletionRate(userId);
+        
         return {
-            totalProjects: 0, // TODO: Implement ProjectModel.getCountByManager(userId)
-            draftProjects: 0, // TODO: Implement ProjectModel.getCountByManagerAndStatus(userId, 'draft')
-            activeProjects: 0, // TODO: Implement ProjectModel.getCountByManagerAndStatus(userId, 'bidding')
-            reviewingProjects: 0, // TODO: Implement ProjectModel.getCountByManagerAndStatus(userId, 'reviewing')
-            awardedProjects: 0, // TODO: Implement ProjectModel.getCountByManagerAndStatus(userId, 'awarded')
-            completedProjects: 0, // TODO: Implement ProjectModel.getCountByManagerAndStatus(userId, 'completed')
-            totalBidsReceived: 0, // TODO: Implement BidModel.getCountForManagerProjects(userId)
-            completionRate: 0, // TODO: Implement ProjectModel.getCompletionRate(userId)
-            projectsThisMonth: 0 // TODO: Implement ProjectModel.getCountByPeriod(30)
+            // Main stats
+            totalProjects: totalProjects,
+            activeProjects: await ProjectModel.getCountByManagerAndStatus(userId, 'bidding'),
+            totalBidsReceived: await BidModel.getCountForManagerProjects(userId),
+            completionRate: Math.round(completionRate),
+            
+            // Project status breakdown for overview
+            draftProjects: await ProjectModel.getCountByManagerAndStatus(userId, 'draft'),
+            reviewingProjects: await ProjectModel.getCountByManagerAndStatus(userId, 'reviewing'),
+            awardedProjects: await ProjectModel.getCountByManagerAndStatus(userId, 'awarded'),
+            completedProjects: completedProjects,
+            
+            // Additional stats
+            projectsThisMonth: await ProjectModel.getCountByPeriod(30)
         };
     } catch (error) {
         logger.error('Error getting project manager stats:', error);
@@ -96,19 +103,24 @@ async function getProjectManagerStats(userId) {
     }
 }
 
-// Get installation company statistics (simplified)
+// Get installation company statistics
 async function getInstallationCompanyStats(userId) {
     try {
+        const totalBids = await BidModel.getCountByUser(userId);
+        const wonBids = await BidModel.getCountByUserAndStatus(userId, 'won');
+        const lostBids = await BidModel.getCountByUserAndStatus(userId, 'lost');
+        const winRate = await BidModel.getWinRate(userId);
+        
         return {
-            totalBids: await BidModel.getCountByUser(userId),
-            pendingBids: 0, // TODO: Implement BidModel.getCountByUserAndStatus(userId, 'pending')
-            wonBids: 0, // TODO: Implement BidModel.getCountByUserAndStatus(userId, 'won')
-            lostBids: 0, // TODO: Implement BidModel.getCountByUserAndStatus(userId, 'lost')
-            winRate: await BidModel.getWinRate(userId),
-            averageBidAmount: 0, // TODO: Implement BidModel.getAverageAmountByUser(userId)
-            bidsThisMonth: 0, // TODO: Implement BidModel.getCountByPeriod(30)
-            averageRating: 0, // TODO: Implement UserModel.getAverageRating(userId)
-            totalRatings: 0 // TODO: Implement UserModel.getRatingCount(userId)
+            totalBids: totalBids,
+            pendingBids: await BidModel.getCountByUserAndStatus(userId, 'pending'),
+            wonBids: wonBids,
+            lostBids: lostBids,
+            winRate: Math.round(winRate),
+            averageBidAmount: await BidModel.getAverageAmountByUser(userId),
+            bidsThisMonth: await BidModel.getCountByPeriod(30),
+            averageRating: await UserModel.getAverageRating(userId),
+            totalRatings: await UserModel.getRatingCount(userId)
         };
     } catch (error) {
         logger.error('Error getting installation company stats:', error);
@@ -116,14 +128,17 @@ async function getInstallationCompanyStats(userId) {
     }
 }
 
-// Get admin recent activity (simplified)
+// Get admin recent activity
 async function getAdminRecentActivity() {
     try {
         const users = await UserModel.getAll();
+        const recentProjects = await ProjectModel.getRecent(5);
+        const recentBids = await BidModel.getRecent(5);
+        
         return {
             recentUsers: users.slice(0, 5), // Get first 5 users as "recent"
-            recentProjects: [], // TODO: Implement ProjectModel.getRecent(5)
-            recentBids: [], // TODO: Implement BidModel.getRecent(5)
+            recentProjects: recentProjects,
+            recentBids: recentBids,
             pendingUsers: users.filter(u => !u.approved).slice(0, 5)
         };
     } catch (error) {
@@ -132,120 +147,97 @@ async function getAdminRecentActivity() {
     }
 }
 
-// Get project manager recent activity (simplified)
+// Get project manager recent activity - FIXED to use actual methods
 async function getProjectManagerRecentActivity(userId) {
     try {
+        // Get the user's recent projects (last 3-5)
+        const recentProjects = await ProjectModel.getRecentByManager(userId, 5);
+        
+        // Get recent bids for all of the manager's projects
+        const recentBids = await BidModel.getRecentForManagerProjects(userId, 10);
+        
+        // Get projects that might need review (bidding phase ended)
+        const allManagerProjects = await ProjectModel.getByManager(userId);
+        const projectsNeedingReview = allManagerProjects.filter(p => {
+            // Projects in bidding status where bid due date has passed
+            if (p.status === 'bidding' && p.bid_due_date) {
+                return new Date(p.bid_due_date) < new Date();
+            }
+            // Or projects in reviewing status
+            return p.status === 'reviewing';
+        }).slice(0, 5);
+        
+        // Get upcoming delivery deadlines
+        const upcomingDeadlines = allManagerProjects.filter(p => {
+            if (p.status === 'awarded' && p.delivery_date) {
+                const deliveryDate = new Date(p.delivery_date);
+                const daysDiff = (deliveryDate - new Date()) / (1000 * 60 * 60 * 24);
+                return daysDiff > 0 && daysDiff <= 30; // Next 30 days
+            }
+            return false;
+        }).sort((a, b) => new Date(a.delivery_date) - new Date(b.delivery_date)).slice(0, 5);
+        
         return {
-            recentProjects: [], // TODO: Implement ProjectModel.getRecentByManager(userId, 5)
-            recentBids: [], // TODO: Implement BidModel.getRecentForManagerProjects(userId, 10)
-            projectsNeedingReview: [], // TODO: Implement logic for projects needing review
-            upcomingDeadlines: [] // TODO: Implement logic for upcoming deadlines
+            recentProjects: recentProjects,
+            recentBids: recentBids,
+            projectsNeedingReview: projectsNeedingReview,
+            upcomingDeadlines: upcomingDeadlines
         };
     } catch (error) {
         logger.error('Error getting project manager recent activity:', error);
-        throw error;
+        // Return empty arrays as fallback
+        return {
+            recentProjects: [],
+            recentBids: [],
+            projectsNeedingReview: [],
+            upcomingDeadlines: []
+        };
     }
 }
 
-// Get installation company recent activity (simplified)
+// Get installation company recent activity
 async function getInstallationCompanyRecentActivity(userId) {
     try {
+        const recentBids = await BidModel.getRecentByUser(userId, 10);
+        const availableProjects = await ProjectModel.getByStatus('bidding');
+        
+        // Get all user bids and filter for won bids
+        const allUserBids = await BidModel.getUserBids(userId);
+        const wonBids = allUserBids.filter(b => b.status === 'won');
+        const wonProjectIds = wonBids.map(b => b.project_id);
+        const wonProjects = [];
+        
+        for (const projectId of wonProjectIds) {
+            const project = await ProjectModel.getById(projectId);
+            if (project) {
+                wonProjects.push(project);
+            }
+        }
+        
+        // Get upcoming deliveries (won projects with future delivery dates)
+        const upcomingDeliveries = wonProjects.filter(p => {
+            if (p.delivery_date) {
+                return new Date(p.delivery_date) > new Date();
+            }
+            return false;
+        }).sort((a, b) => new Date(a.delivery_date) - new Date(b.delivery_date)).slice(0, 5);
+        
         return {
-            recentBids: [], // TODO: Implement BidModel.getRecentByUser(userId, 10)
-            availableProjects: [], // TODO: Implement ProjectModel.getByStatus('bidding')
-            wonProjects: [], // TODO: Implement logic for won projects
-            upcomingDeliveries: [] // TODO: Implement logic for upcoming deliveries
+            recentBids: recentBids,
+            availableProjects: availableProjects.slice(0, 10),
+            wonProjects: wonProjects.slice(0, 5),
+            upcomingDeliveries: upcomingDeliveries
         };
     } catch (error) {
         logger.error('Error getting installation company recent activity:', error);
-        throw error;
+        // Return empty arrays as fallback
+        return {
+            recentBids: [],
+            availableProjects: [],
+            wonProjects: [],
+            upcomingDeliveries: []
+        };
     }
-}
-
-// Chart data endpoints (simplified)
-router.get('/charts/:type', authenticateToken, async (req, res) => {
-    try {
-        const { type } = req.params;
-        const { days = 30 } = req.query;
-        
-        let chartData;
-        
-        switch (type) {
-            case 'projects':
-                chartData = await getProjectsChartData(req.user, parseInt(days));
-                break;
-            case 'bids':
-                chartData = await getBidsChartData(req.user, parseInt(days));
-                break;
-            case 'users':
-                if (req.user.role !== 'admin') {
-                    return res.status(403).json({ error: 'Access denied' });
-                }
-                chartData = await getUsersChartData(parseInt(days));
-                break;
-            case 'revenue':
-                chartData = await getRevenueChartData(req.user, parseInt(days));
-                break;
-            default:
-                return res.status(400).json({ error: 'Invalid chart type' });
-        }
-        
-        res.json(chartData);
-    } catch (error) {
-        logger.error('Error fetching chart data:', error);
-        res.status(500).json({ error: 'Failed to fetch chart data' });
-    }
-});
-
-// Simplified chart data functions (placeholder data)
-async function getProjectsChartData(user, days) {
-    // Return sample data until proper implementation
-    return {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [
-            {
-                label: 'Projects Created',
-                data: [5, 3, 8, 2, 6, 4]
-            },
-            {
-                label: 'Projects Completed', 
-                data: [2, 5, 3, 7, 1, 8]
-            }
-        ]
-    };
-}
-
-async function getBidsChartData(user, days) {
-    // Return sample data until proper implementation
-    return {
-        labels: ['Won', 'Lost', 'Pending'],
-        datasets: [{
-            label: 'Bids',
-            data: [12, 8, 5]
-        }]
-    };
-}
-
-async function getUsersChartData(days) {
-    // Return sample data until proper implementation
-    return {
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-        datasets: [{
-            label: 'New Users',
-            data: [3, 7, 2, 5]
-        }]
-    };
-}
-
-async function getRevenueChartData(user, days) {
-    // Return sample data until proper implementation
-    return {
-        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-        datasets: [{
-            label: 'Revenue',
-            data: [45000, 52000, 48000, 61000]
-        }]
-    };
 }
 
 module.exports = router;
