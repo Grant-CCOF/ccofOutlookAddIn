@@ -683,7 +683,17 @@ const ProjectModals = {
     
     // Process project form data
     processProjectFormData(formData) {
-        const data = Object.fromEntries(formData.entries());
+        const data = {};
+    
+        // Convert FormData to object
+        for (let [key, value] of formData.entries()) {
+            // Skip individual checkbox fields with bracket notation
+            if (key.includes('[') && key.includes(']')) {
+                continue;  // Skip these fields
+            }
+            
+            data[key] = value;
+        }
         
         // Handle checkboxes
         data.show_max_bid = formData.has('show_max_bid');

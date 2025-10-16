@@ -94,9 +94,6 @@ class SchedulerService {
             
             logger.info(`✓ Auto-closed bidding for project: ${project.id} - "${project.title}"`);
             
-            // Send notifications
-            await this.sendClosureNotifications(project);
-
             // Get bid statistics
             const stats = await db.get(
                 `SELECT COUNT(*) as total_bids,
@@ -107,10 +104,37 @@ class SchedulerService {
                 [project.id]
             );
             
-            // Send email to project owner
-            await emailService.sendBidClosingEmail(project, stats);
+            // Send both in-app notification and email to project manager
+            // We don't fail the whole operation if notifications fail
             
-            // Log the automatic closure
+            // 1. In-app notification
+            try {
+                await NotificationService.notifyUser(
+                    project.project_manager_id,
+                    'Bidding Period Closed',
+                    `The bidding period for "${project.title}" has automatically closed. ${stats.total_bids} bid(s) received. Please review the submitted bids.`,
+                    'bidding_closed',
+                    JSON.stringify({
+                        project_id: project.id,
+                        closed_at: new Date().toISOString(),
+                        auto_closed: true,
+                        total_bids: stats.total_bids
+                    })
+                );
+                logger.info(`In-app notification sent to project manager for project ${project.id}`);
+            } catch (error) {
+                logger.error(`Failed to send in-app notification for project ${project.id}:`, error);
+            }
+            
+            // 2. Email notification with bid summary
+            try {
+                await emailService.sendBidClosingEmail(project, stats);
+                logger.info(`Email notification sent to project manager for project ${project.id}`);
+            } catch (error) {
+                logger.error(`Failed to send email notification for project ${project.id}:`, error);
+            }
+            
+            // Log the automatic closure for audit
             this.logAutoClosure(project);
             
             return true;
@@ -118,54 +142,6 @@ class SchedulerService {
         } catch (error) {
             logger.error(`Failed to auto-close bidding for project ${project.id}:`, error);
             return false;
-        }
-    }
-
-    /**
-     * Send all notifications related to bidding closure
-     */
-    async sendClosureNotifications(project) {
-        try {
-            // Notify project manager
-            await NotificationService.create({
-                user_id: project.project_manager_id,
-                title: 'Bidding Period Closed',
-                content: `The bidding period for "${project.title}" has automatically closed. Please review the submitted bids.`,
-                type: 'bidding_closed',
-                data: JSON.stringify({
-                    project_id: project.id,
-                    closed_at: new Date().toISOString(),
-                    auto_closed: true
-                })
-            });
-
-            // Notify all bidders
-            const biddersSql = `
-                SELECT DISTINCT b.user_id, p.title as project_title
-                FROM bids b
-                JOIN projects p ON b.project_id = p.id
-                WHERE b.project_id = ? AND b.status = 'pending'
-            `;
-
-            const bidders = await db.all(biddersSql, [project.id]);
-            
-            for (const bidder of bidders) {
-                await NotificationService.create({
-                    user_id: bidder.user_id,
-                    title: 'Bidding Period Ended',
-                    content: `The bidding period for "${bidder.project_title}" has ended. The project is now under review.`,
-                    type: 'bidding_closed',
-                    data: JSON.stringify({
-                        project_id: project.id,
-                        closed_at: new Date().toISOString()
-                    })
-                });
-            }
-
-            logger.info(`Sent closure notifications for project ${project.id} to ${bidders.length + 1} users`);
-
-        } catch (error) {
-            logger.error(`Error sending notifications for project ${project.id}:`, error);
         }
     }
 
