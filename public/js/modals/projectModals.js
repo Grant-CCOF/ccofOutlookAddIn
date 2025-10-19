@@ -569,11 +569,18 @@ const ProjectModals = {
     // Handle edit project with file management
     async handleEditProject(projectId) {
         try {
+            App.showLoading(true);
             const form = DOM.get('editProjectForm');
             const formData = new FormData(form);
             
-            // Process form data
+            // Process form data as before
             const data = this.processProjectFormData(formData);
+            
+            // Add start_bidding flag if it was set from the warning dialog
+            if (window.tempEditPreferences?.startBiddingAfterEdit) {
+                data.start_bidding = true;
+                delete window.tempEditPreferences; // Clean up
+            }
             
             // Validate
             const validation = this.validateProjectData(data);
@@ -582,9 +589,7 @@ const ProjectModals = {
                 return;
             }
             
-            App.showLoading(true);
-            
-            // Update project
+            // Update project via API
             await API.projects.update(projectId, data);
             
             // Handle file deletions
@@ -607,7 +612,12 @@ const ProjectModals = {
                 await Promise.all(uploadPromises);
             }
             
-            App.showSuccess('Project updated successfully');
+            // Show appropriate success message
+            const message = data.start_bidding ? 
+                'Project updated and bidding started' : 
+                'Project updated successfully';
+            
+            App.showSuccess(message);
             this.closeModal();
             
             // Refresh project details or list

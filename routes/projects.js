@@ -176,26 +176,131 @@ router.put('/:id', [
             return res.status(403).json({ error: 'Access denied' });
         }
         
-        // Don't allow certain changes after bidding starts
-        if (project.status !== 'draft' && (req.body.max_bid || req.body.bid_due_date)) {
-            return res.status(400).json({ error: 'Cannot modify bid parameters after bidding starts' });
+        // NEW LOGIC: Check if project has any bids
+        const bidStats = await BidModel.getProjectBidStats(project.id);
+        const hasBids = bidStats.count > 0;
+        
+        // Modified validation logic:
+        // 1. Draft projects can always be edited
+        // 2. Bidding/Reviewing projects can be edited ONLY if they have no bids
+        // 3. If editing a bidding/reviewing project with no bids, it resets to draft
+        
+        if (project.status === 'draft') {
+            // Draft projects can be edited freely
+            // No special handling needed
+        } else if (['bidding', 'reviewing'].includes(project.status)) {
+            // Check if there are any bids
+            if (hasBids) {
+                return res.status(400).json({ 
+                    error: 'Cannot modify project after bids have been submitted',
+                    bid_count: bidStats.count
+                });
+            }
+            
+            // No bids exist - allow editing but reset to draft unless start_bidding is true
+            if (!req.body.start_bidding) {
+                req.body.status = 'draft';
+                logger.info(`Project ${project.id} reset to draft due to editing with no bids`);
+            }
+        } else if (['awarded', 'in_progress', 'completed', 'cancelled'].includes(project.status)) {
+            // These statuses cannot be edited at all
+            return res.status(400).json({ 
+                error: `Cannot modify project in ${project.status} status` 
+            });
         }
         
-        await ProjectModel.update(req.params.id, req.body);
+        // Process the update data
+        const updateData = { ...req.body };
+        
+        // Remove start_bidding flag as it's not a database field
+        delete updateData.start_bidding;
+        
+        // Validate dates if being updated
+        if (updateData.bid_due_date || updateData.delivery_date) {
+            const bidDueDate = updateData.bid_due_date ? 
+                new Date(updateData.bid_due_date) : 
+                new Date(project.bid_due_date);
+            const deliveryDate = updateData.delivery_date ? 
+                new Date(updateData.delivery_date) : 
+                new Date(project.delivery_date);
+            
+            if (bidDueDate >= deliveryDate) {
+                return res.status(400).json({ 
+                    error: 'Bid due date must be before delivery date' 
+                });
+            }
+            
+            // Check that dates are in the future (only for non-admin users)
+            if (req.user.role !== 'admin') {
+                const now = new Date();
+                if (bidDueDate < now) {
+                    return res.status(400).json({ 
+                        error: 'Bid due date must be in the future' 
+                    });
+                }
+            }
+        }
+        
+        // Store old status for logging
+        const oldStatus = project.status;
+        const newStatus = updateData.status || oldStatus;
+        
+        // Perform the update
+        await ProjectModel.update(req.params.id, updateData);
         const updatedProject = await ProjectModel.getById(req.params.id);
         
-        // Notify if status changed
-        if (req.body.status && req.body.status !== project.status) {
+        // If status changed, send notifications
+        if (newStatus !== oldStatus) {
             await NotificationService.notifyProjectUpdate(
                 project.id,
                 'Project Status Update',
-                `Project status changed to ${req.body.status}`
+                `Project "${project.title}" status changed from ${oldStatus} to ${newStatus}`
             );
+            
+            // If reset to draft from bidding/reviewing, notify relevant parties
+            if (oldStatus === 'bidding' && newStatus === 'draft') {
+                await NotificationService.broadcastToRole(
+                    'installation_company',
+                    'Project Withdrawn',
+                    `Project "${project.title}" has been withdrawn for editing and will be re-opened for bidding soon.`,
+                    'project_update',
+                    { project_id: project.id, action: 'withdrawn' }
+                );
+            }
         }
         
-        logger.info(`Project updated: ${project.id} by ${req.user.username}`);
+        // If start_bidding was requested and project is now in draft, immediately start bidding
+        if (req.body.start_bidding && updatedProject.status === 'draft') {
+            await ProjectModel.updateStatus(req.params.id, 'bidding');
+            updatedProject.status = 'bidding';
+            
+            // Notify installation companies
+            await NotificationService.broadcastToRole(
+                'installation_company',
+                'Project Available for Bidding',
+                `Project "${updatedProject.title}" is now open for bidding`,
+                'new_project',
+                { project_id: updatedProject.id }
+            );
+            
+            logger.info(`Project ${req.params.id} immediately started bidding after edit`);
+        }
         
-        res.json(updatedProject);
+        logger.info(`Project updated: ${req.params.id} by user ${req.user.username}`, {
+            old_status: oldStatus,
+            new_status: updatedProject.status,
+            had_bids: hasBids,
+            changes: Object.keys(updateData)
+        });
+        
+        res.json({
+            success: true,
+            project: updatedProject,
+            message: hasBids === false && oldStatus !== 'draft' ? 
+                'Project updated and reset to draft (no bids existed)' : 
+                'Project updated successfully'
+        });
+        
     } catch (error) {
         logger.error('Error updating project:', error);
         res.status(500).json({ error: 'Failed to update project' });

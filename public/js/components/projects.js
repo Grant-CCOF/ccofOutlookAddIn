@@ -1209,9 +1209,87 @@ const ProjectsComponent = {
     },
     
     async editProject(projectId) {
-        const project = await API.projects.getById(projectId);
-        ProjectModals.showEditModal(project);
+        try {
+            const project = await API.projects.getById(projectId);
+            
+            // Check if project has bids and is in bidding/reviewing status
+            if (['bidding', 'reviewing'].includes(project.status) && project.bid_count === 0) {
+                // Show warning that editing will reset to draft
+                const proceed = await this.showEditWarning(project);
+                if (!proceed) return;
+            }
+            
+            ProjectModals.showEditModal(project);
+        } catch (error) {
+            App.showError('Failed to load project for editing');
+        }
     },
+
+    async showEditWarning(project) {
+        return new Promise((resolve) => {
+            const modalHtml = `
+                <div class="modal fade" id="editWarningModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning text-dark">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-exclamation-triangle"></i> Edit Project Warning
+                                </h5>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning">
+                                    <strong>Important:</strong> This project is currently in 
+                                    <span class="badge badge-primary">${project.status.toUpperCase()}</span> status.
+                                </div>
+                                <p>Since there are no bids on this project, you can edit it, but:</p>
+                                <ul>
+                                    <li>The project will be <strong>reset to DRAFT</strong> status</li>
+                                    <li>You'll need to manually start bidding again after making changes</li>
+                                    <li>Any notifications sent to bidders will be invalidated</li>
+                                </ul>
+                                <div class="form-check mt-3">
+                                    <input type="checkbox" class="form-check-input" id="startBiddingAfterEdit">
+                                    <label class="form-check-label" for="startBiddingAfterEdit">
+                                        Automatically start bidding after saving changes
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal" 
+                                        onclick="document.getElementById('editWarningModal').remove(); resolve(false)">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn btn-warning" 
+                                        onclick="ProjectsComponent.proceedWithEdit(${project.id}, resolve)">
+                                    <i class="fas fa-edit"></i> Proceed with Edit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('editWarningModal'));
+            modal.show();
+        });
+    },
+
+    proceedWithEdit(projectId, resolve) {
+        const startBiddingAfter = document.getElementById('startBiddingAfterEdit')?.checked || false;
+        
+        // Store the preference in a temporary variable
+        window.tempEditPreferences = {
+            startBiddingAfterEdit: startBiddingAfter
+        };
+        
+        // Remove warning modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editWarningModal'));
+        modal.hide();
+        document.getElementById('editWarningModal').remove();
+        
+        resolve(true);
+},
     
     async showBidModal(projectId) {
         try {

@@ -266,7 +266,14 @@ const ProjectTemplates = {
         const isAdmin = user.role === 'admin';
         const actions = [];
         
-        if (isManager) {
+        // Determine if project can be edited
+        const canEdit = isAdmin || (isManager && (
+            project.status === 'draft' || 
+            (['bidding', 'reviewing'].includes(project.status) && project.bid_count === 0)
+        ));
+        
+        if (isManager || isAdmin) {
+            // Start/Resume Bidding button
             if (project.status === 'draft') {
                 actions.push(`
                     <button class="btn btn-success" onclick="ProjectsComponent.startBidding(${project.id})">
@@ -275,7 +282,17 @@ const ProjectTemplates = {
                 `);
             }
             
-            if (project.status === 'reviewing' && project.bids?.length > 0) {
+            // Close Bidding button (only if there are bids)
+            if (project.status === 'bidding' && project.bid_count > 0) {
+                actions.push(`
+                    <button class="btn btn-warning" onclick="ProjectsComponent.closeBidding(${project.id})">
+                        <i class="fas fa-stop"></i> Close Bidding
+                    </button>
+                `);
+            }
+            
+            // Award Project button
+            if (project.status === 'reviewing' && project.bid_count > 0) {
                 actions.push(`
                     <button class="btn btn-primary" onclick="ProjectsComponent.showAwardModal(${project.id})">
                         <i class="fas fa-trophy"></i> Award Project
@@ -283,6 +300,7 @@ const ProjectTemplates = {
                 `);
             }
             
+            // Mark Complete button
             if (project.status === 'awarded') {
                 actions.push(`
                     <button class="btn btn-success" onclick="ProjectsComponent.markComplete(${project.id})">
@@ -291,61 +309,68 @@ const ProjectTemplates = {
                 `);
             }
             
-            if (['draft', 'bidding'].includes(project.status)) {
+            // Edit button - now enabled for bidding/reviewing with no bids
+            if (canEdit) {
+                const warningText = (['bidding', 'reviewing'].includes(project.status) && project.bid_count === 0) ?
+                    'Note: Editing will reset the project to draft status' : '';
+                
                 actions.push(`
-                    <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
+                    <button class="btn btn-outline" 
+                            onclick="ProjectsComponent.editProject(${project.id})"
+                            ${warningText ? `title="${warningText}"` : ''}>
                         <i class="fas fa-edit"></i> Edit
+                        ${project.status !== 'draft' && project.bid_count === 0 ? 
+                            '<span class="badge badge-warning ml-1">Will Reset to Draft</span>' : ''}
+                    </button>
+                `);
+            } else if (!canEdit && ['bidding', 'reviewing'].includes(project.status) && project.bid_count > 0) {
+                // Show disabled edit button with explanation
+                actions.push(`
+                    <button class="btn btn-outline" 
+                            disabled 
+                            title="Cannot edit - project has ${project.bid_count} bid(s)"
+                            style="cursor: not-allowed; opacity: 0.6;">
+                        <i class="fas fa-edit"></i> Edit
+                        <span class="badge badge-secondary ml-1">${project.bid_count} bid(s)</span>
                     </button>
                 `);
             }
-
-            if ((isAdmin || isManager) && !['awarded', 'completed'].includes(project.status)) {
-                actions.push(`
-                    <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                `);
-            } else if ((isAdmin || isManager) && ['awarded', 'completed'].includes(project.status)) {
-                // Show disabled delete button with tooltip
-                actions.push(`
-                    <button class="btn btn-danger" disabled 
-                            data-bs-toggle="tooltip" 
-                            data-bs-placement="top" 
-                            title="Cannot delete ${project.status} projects">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                `);
+            
+            // Delete button
+            if (isAdmin || (isManager && ['draft', 'bidding', 'reviewing'].includes(project.status))) {
+                if (project.bid_count === 0) {
+                    actions.push(`
+                        <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    `);
+                } else {
+                    actions.push(`
+                        <button class="btn btn-danger" disabled
+                                title="Cannot delete - project has ${project.bid_count} bid(s)"
+                                style="cursor: not-allowed; opacity: 0.6;">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    `);
+                }
             }
         }
         
-        // UPDATED SECTION: Check if contractor has already placed a bid
+        // Contractor actions
         if (isContractor && project.status === 'bidding') {
             if (project.has_bid) {
-                // Installer has already placed a bid - show View Bid button
                 actions.push(`
                     <button class="btn btn-info" onclick="ProjectsComponent.viewUserBid(${project.id})">
                         <i class="fas fa-eye"></i> View Your Bid
                     </button>
                 `);
             } else {
-                // Installer hasn't placed a bid yet - show Place Bid button
                 actions.push(`
                     <button class="btn btn-primary" onclick="ProjectsComponent.showBidModal(${project.id})">
                         <i class="fas fa-gavel"></i> Place Bid
                     </button>
                 `);
             }
-        }
-        
-        // Also show View Bid button for other statuses if the installer has a bid
-        if (isContractor && project.has_bid && project.status !== 'bidding') {
-            const statusLabel = project.user_bid_status === 'won' ? 'Winning' : 
-                            project.user_bid_status === 'lost' ? 'Lost' : 'Your';
-            actions.push(`
-                <button class="btn btn-info" onclick="ProjectsComponent.viewUserBid(${project.id})">
-                    <i class="fas fa-eye"></i> View ${statusLabel} Bid
-                </button>
-            `);
         }
         
         return actions.join(' ');
