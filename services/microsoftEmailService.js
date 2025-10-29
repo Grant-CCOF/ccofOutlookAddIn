@@ -763,6 +763,399 @@ class MicrosoftEmailService {
         }
     }
 
+    async sendProjectCompletionEmail(project, winner) {
+        try {
+            const results = [];
+            
+            // 1. Get project manager details
+            const pm = await db.get(
+                'SELECT email, name FROM users WHERE id = ?',
+                [project.project_manager_id]
+            );
+            
+            // 2. Get all bidders who participated in this project
+            const bidders = await db.all(
+                `SELECT DISTINCT u.email, u.name, u.company, b.id as bid_id, b.user_id,
+                        CASE WHEN b.user_id = ? THEN 1 ELSE 0 END as is_winner
+                FROM bids b 
+                JOIN users u ON b.user_id = u.id 
+                WHERE b.project_id = ?`,
+                [winner?.id || project.awarded_to, project.id]
+            );
+            
+            // 3. Send email to project manager
+            if (pm && pm.email) {
+                const pmSubject = `Project Completed: ${project.title}`;
+                const pmHtml = this.getProjectCompletionPMEmailHtml(project, winner, pm);
+                
+                try {
+                    const pmResult = await this.sendEmail(pm.email, pmSubject, pmHtml);
+                    results.push({
+                        recipient: 'project_manager',
+                        email: pm.email,
+                        ...pmResult
+                    });
+                    logger.info(`Project completion email sent to PM: ${pm.email}`);
+                } catch (error) {
+                    logger.error(`Failed to send completion email to PM ${pm.email}:`, error);
+                    results.push({
+                        recipient: 'project_manager',
+                        email: pm.email,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            // 4. Send emails to all bidders (different content for winner vs others)
+            for (const bidder of bidders) {
+                try {
+                    const isWinner = bidder.is_winner === 1;
+                    const subject = isWinner ? 
+                        `✅ Project Completed: ${project.title}` : 
+                        `Project Update: ${project.title} - Completed`;
+                    
+                    const html = isWinner ? 
+                        this.getProjectCompletionWinnerEmailHtml(project, bidder) : 
+                        this.getProjectCompletionBidderEmailHtml(project, winner, bidder);
+                    
+                    const result = await this.sendEmail(bidder.email, subject, html);
+                    results.push({
+                        recipient: isWinner ? 'winner' : 'bidder',
+                        email: bidder.email,
+                        ...result
+                    });
+                    
+                    logger.info(`Project completion email sent to ${isWinner ? 'winner' : 'bidder'}: ${bidder.email}`);
+                    
+                } catch (error) {
+                    logger.error(`Failed to send completion email to ${bidder.email}:`, error);
+                    results.push({
+                        recipient: 'bidder',
+                        email: bidder.email,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            const successCount = results.filter(r => r.success).length;
+            const failureCount = results.filter(r => !r.success).length;
+            
+            logger.info(`Project completion emails sent: ${successCount} successful, ${failureCount} failed`);
+            
+            return { 
+                success: failureCount === 0, 
+                results,
+                summary: {
+                    total: results.length,
+                    successful: successCount,
+                    failed: failureCount
+                }
+            };
+            
+        } catch (error) {
+            logger.error('Error sending project completion emails:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Helper function for Project Manager completion email
+    getProjectCompletionPMEmailHtml(project, winner, pm) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { 
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        color: white; 
+                        padding: 30px; 
+                        text-align: center;
+                        border-radius: 12px 12px 0 0;
+                    }
+                    .header h1 { margin: 0; font-size: 28px; }
+                    .header p { margin: 10px 0 0 0; opacity: 0.95; }
+                    .content { 
+                        padding: 30px; 
+                        background-color: #ffffff;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 0 0 12px 12px;
+                    }
+                    .success-badge {
+                        display: inline-block;
+                        background: #d4edda;
+                        color: #155724;
+                        padding: 8px 16px;
+                        border-radius: 20px;
+                        font-weight: bold;
+                        margin: 10px 0;
+                    }
+                    .info-box { 
+                        background: #f8f9fa; 
+                        padding: 20px; 
+                        border-radius: 8px; 
+                        margin: 20px 0;
+                        border-left: 4px solid #28a745;
+                    }
+                    .info-box h3 { margin-top: 0; color: #28a745; }
+                    .button { 
+                        display: inline-block;
+                        padding: 12px 30px;
+                        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 25px;
+                        font-weight: bold;
+                        margin: 20px 0;
+                    }
+                    .footer { 
+                        text-align: center; 
+                        padding: 20px; 
+                        color: #666;
+                        font-size: 12px;
+                    }
+                    .checkmark { 
+                        font-size: 48px;
+                        color: #28a745;
+                        text-align: center;
+                        margin: 20px 0;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Project Completed Successfully!</h1>
+                        <p>Your project has been marked as complete</p>
+                    </div>
+                    <div class="content">
+                        <div class="checkmark">✓</div>
+                        
+                        <h2>Hello ${pm.name || 'Project Manager'},</h2>
+                        
+                        <p>Great news! The following project has been successfully completed:</p>
+                        
+                        <div class="info-box">
+                            <h3>${project.title}</h3>
+                            <p><strong>Project ID:</strong> #${project.id}</p>
+                            <p><strong>Location:</strong> ${project.city}, ${project.state} ${project.zip_code}</p>
+                            <p><strong>Completed Date:</strong> ${new Date().toLocaleDateString()}</p>
+                            ${winner ? `
+                                <p><strong>Completed By:</strong> ${winner.company || winner.name}</p>
+                                <p><strong>Final Amount:</strong> $${project.awarded_amount || 'N/A'}</p>
+                            ` : ''}
+                        </div>
+                        
+                        <p><strong>Next Steps:</strong></p>
+                        <ul>
+                            <li>Review the completed work</li>
+                            <li>Confirm all deliverables have been met</li>
+                            <li>Process final payment if applicable</li>
+                            <li>Consider leaving feedback for the installer</li>
+                        </ul>
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/#/projects/${project.id}" class="button">
+                                View Project Details
+                            </a>
+                        </center>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; 2024 Capital Choice Office Furniture. All rights reserved.</p>
+                        <p>This is an automated notification from the CC Bid Platform</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    // Helper function for Winner completion email
+    getProjectCompletionWinnerEmailHtml(project, winner) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { 
+                        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+                        color: white; 
+                        padding: 30px; 
+                        text-align: center;
+                        border-radius: 12px 12px 0 0;
+                    }
+                    .header h1 { margin: 0; font-size: 28px; }
+                    .content { 
+                        padding: 30px; 
+                        background-color: #ffffff;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 0 0 12px 12px;
+                    }
+                    .celebration {
+                        text-align: center;
+                        font-size: 72px;
+                        margin: 20px 0;
+                    }
+                    .info-box { 
+                        background: #fff3cd; 
+                        padding: 20px; 
+                        border-radius: 8px; 
+                        margin: 20px 0;
+                        border-left: 4px solid #ffc107;
+                    }
+                    .button { 
+                        display: inline-block;
+                        padding: 12px 30px;
+                        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 25px;
+                        font-weight: bold;
+                        margin: 20px 0;
+                    }
+                    .footer { 
+                        text-align: center; 
+                        padding: 20px; 
+                        color: #666;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>🎊 Project Completed! 🎊</h1>
+                    </div>
+                    <div class="content">
+                        <div class="celebration">🏆</div>
+                        
+                        <h2>Congratulations ${winner.company || winner.name}!</h2>
+                        
+                        <p>Excellent work! You have successfully completed the following project:</p>
+                        
+                        <div class="info-box">
+                            <h3>${project.title}</h3>
+                            <p><strong>Project ID:</strong> #${project.id}</p>
+                            <p><strong>Location:</strong> ${project.city}, ${project.state} ${project.zip_code}</p>
+                            <p><strong>Completion Date:</strong> ${new Date().toLocaleDateString()}</p>
+                        </div>
+                        
+                        <p>Thank you for your professional service and dedication to completing this project successfully. Your work is greatly appreciated!</p>
+                        
+                        <p><strong>What's Next:</strong></p>
+                        <ul>
+                            <li>Ensure all deliverables have been submitted</li>
+                            <li>Submit your final invoice if applicable</li>
+                            <li>Keep an eye out for new project opportunities</li>
+                        </ul>
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/#/projects" class="button">
+                                View More Projects
+                            </a>
+                        </center>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; 2024 Capital Choice Office Furniture. All rights reserved.</p>
+                        <p>Thank you for being a valued partner!</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    // Helper function for other bidders completion email
+    getProjectCompletionBidderEmailHtml(project, winner, bidder) {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { 
+                        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+                        color: white; 
+                        padding: 30px; 
+                        text-align: center;
+                        border-radius: 12px 12px 0 0;
+                    }
+                    .header h1 { margin: 0; font-size: 28px; }
+                    .content { 
+                        padding: 30px; 
+                        background-color: #ffffff;
+                        border: 1px solid #e0e0e0;
+                        border-radius: 0 0 12px 12px;
+                    }
+                    .info-box { 
+                        background: #f8f9fa; 
+                        padding: 20px; 
+                        border-radius: 8px; 
+                        margin: 20px 0;
+                        border-left: 4px solid #6c757d;
+                    }
+                    .button { 
+                        display: inline-block;
+                        padding: 12px 30px;
+                        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 25px;
+                        font-weight: bold;
+                        margin: 20px 0;
+                    }
+                    .footer { 
+                        text-align: center; 
+                        padding: 20px; 
+                        color: #666;
+                        font-size: 12px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>Project Status Update</h1>
+                    </div>
+                    <div class="content">
+                        <h2>Hello ${bidder.company || bidder.name},</h2>
+                        
+                        <p>We wanted to inform you that the following project has been completed:</p>
+                        
+                        <div class="info-box">
+                            <h3>${project.title}</h3>
+                            <p><strong>Project ID:</strong> #${project.id}</p>
+                            <p><strong>Location:</strong> ${project.city}, ${project.state} ${project.zip_code}</p>
+                            <p><strong>Status:</strong> Completed</p>
+                            ${winner ? `<p><strong>Completed By:</strong> ${winner.company || winner.name}</p>` : ''}
+                        </div>
+                        
+                        <p>Thank you for your interest in this project and for submitting your bid. While your bid wasn't selected this time, we value your participation and encourage you to continue bidding on future opportunities.</p>
+                        
+                        <p>There are always new projects being added to our platform. Stay active and keep an eye out for opportunities that match your expertise!</p>
+                        
+                        <center>
+                            <a href="${process.env.APP_URL}/#/projects" class="button">
+                                Browse New Projects
+                            </a>
+                        </center>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; 2024 Capital Choice Office Furniture. All rights reserved.</p>
+                        <p>Thank you for being part of our network!</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
     getWinnerEmailHtml(project, bid, bidder) {
         return `
             <!DOCTYPE html>

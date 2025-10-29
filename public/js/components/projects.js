@@ -570,6 +570,12 @@ const ProjectsComponent = {
         const isManager = user.id === project.project_manager_id;
         const actions = [];
         
+        // Determine if project can be edited
+        const canEdit = isAdmin || (isManager && (
+            project.status === 'draft' || 
+            (['bidding', 'reviewing'].includes(project.status) && project.bid_count === 0)
+        ));
+        
         // Admin can perform all actions
         if (isAdmin || (isManager && project.status === 'draft')) {
             actions.push(`
@@ -603,19 +609,39 @@ const ProjectsComponent = {
             `);
         }
         
+        // Edit button logic - properly handle bidding/reviewing with no bids
         if (isAdmin || isManager) {
-            if (project.status === 'draft') {
+            if (canEdit) {
+                // Show edit button with appropriate warning
+                const warningText = (['bidding', 'reviewing'].includes(project.status) && project.bid_count === 0) ?
+                    'Note: Editing will reset the project to draft status' : '';
+                
                 actions.push(`
-                    <button class="btn btn-outline" onclick="ProjectsComponent.editProject(${project.id})">
+                    <button class="btn btn-outline" 
+                            onclick="ProjectsComponent.editProject(${project.id})"
+                            ${warningText ? `title="${warningText}"` : ''}>
                         <i class="fas fa-edit"></i> Edit
+                        ${project.status !== 'draft' && project.bid_count === 0 ? 
+                            '<span class="badge badge-warning ml-1">Will Reset to Draft</span>' : ''}
                     </button>
                 `);
-            } else {
-                // Show disabled edit button with tooltip for non-draft projects
+            } else if (['bidding', 'reviewing'].includes(project.status) && project.bid_count > 0) {
+                // Show disabled edit button with explanation when there are bids
                 actions.push(`
                     <button class="btn btn-outline" 
                             disabled 
-                            title="Projects cannot be edited after bidding has started. Only draft projects can be edited."
+                            title="Cannot edit - project has ${project.bid_count} bid(s)"
+                            style="cursor: not-allowed; opacity: 0.6;">
+                        <i class="fas fa-edit"></i> Edit
+                        <span class="badge badge-secondary ml-1">${project.bid_count} bid(s)</span>
+                    </button>
+                `);
+            } else if (!['draft', 'bidding', 'reviewing'].includes(project.status)) {
+                // Show disabled edit button for other statuses (awarded, completed, etc.)
+                actions.push(`
+                    <button class="btn btn-outline" 
+                            disabled 
+                            title="Cannot edit - project is in ${project.status} status"
                             style="cursor: not-allowed; opacity: 0.6;">
                         <i class="fas fa-edit"></i> Edit
                     </button>
@@ -623,12 +649,23 @@ const ProjectsComponent = {
             }
         }
 
+        // Delete button
         if (isAdmin || (isManager && ['draft', 'bidding', 'reviewing'].includes(project.status))) {
-            actions.push(`
-                <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
-                    <i class="fas fa-trash"></i> Delete
-                </button>
-            `);
+            if (project.bid_count === 0) {
+                actions.push(`
+                    <button class="btn btn-danger" onclick="ProjectsComponent.showDeleteConfirmation(${project.id})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                `);
+            } else {
+                actions.push(`
+                    <button class="btn btn-danger" disabled
+                            title="Cannot delete - project has ${project.bid_count} bid(s)"
+                            style="cursor: not-allowed; opacity: 0.6;">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                `);
+            }
         }
         
         // Admin-only test actions
