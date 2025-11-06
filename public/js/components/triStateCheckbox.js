@@ -7,7 +7,8 @@ const TriStateCheckbox = {
             options: [
                 'Receive', 'Assemble', 'Deliver', 'Install', 
                 'Furniture Removal', 'Bring Items to Capital Choice', 
-                'Move', 'Punch-List', 'Trash Removal'
+                'Move', 'Punch-List', 'Trash Removal', 
+                'Picking up from Capital Choice', 'Receiving internally'
             ]
         },
         site_info: {

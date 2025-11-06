@@ -8,9 +8,9 @@ class ProjectModel {
                 title, description, status, project_manager_id, zip_code,
                 delivery_date, delivery_time, bid_due_date, max_bid, show_max_bid,
                 site_conditions, custom_fields, special_instructions, training_requirements,
-                access_control_info, product_care_info,
+                access_control_info, product_care_info, distance_from_truck, jobsite_location,
                 scope_options, site_info_options, requirements_options
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         const params = [
@@ -30,6 +30,8 @@ class ProjectModel {
             projectData.training_requirements || null,
             projectData.access_control_info || null,
             projectData.product_care_info || null,
+            projectData.distance_from_truck || null,
+            projectData.jobsite_location || null,
             JSON.stringify(projectData.scope_options || {}),
             JSON.stringify(projectData.site_info_options || {}),
             JSON.stringify(projectData.requirements_options || {})

@@ -142,6 +142,8 @@ class Database {
                 training_requirements TEXT,
                 access_control_info TEXT,
                 product_care_info TEXT,
+                distance_from_truck TEXT,
+                jobsite_location TEXT,
                 scope_options TEXT,
                 site_info_options TEXT,
                 requirements_options TEXT,

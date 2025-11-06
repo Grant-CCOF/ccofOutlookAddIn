@@ -146,6 +146,22 @@ const ProjectModals = {
                             placeholder="Specify any special product care requirements...">${project?.product_care_info || ''}</textarea>
                 </div>
 
+                <div class="form-group">
+                    <label>Distance of push from truck to workspace</label>
+                    <textarea class="form-control" 
+                            name="distance_from_truck" 
+                            rows="3"
+                            placeholder="Specify the distance from truck to workspace (e.g., 50 feet, 100 yards)...">${project?.distance_from_truck || ''}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Location of jobsite</label>
+                    <textarea class="form-control" 
+                            name="jobsite_location" 
+                            rows="3"
+                            placeholder="Enter the jobsite location details...">${project?.jobsite_location || ''}</textarea>
+                </div>
+
                 <div class="tri-state-sections mt-4">
                     <h4 class="mb-3">Project Options</h4>
                     

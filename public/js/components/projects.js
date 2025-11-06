@@ -272,10 +272,12 @@ const ProjectsComponent = {
                             <span class="project-stat-label">Delivery</span>
                             <span class="project-stat-value">${Formatter.datetime(project.delivery_date)}</span>
                         </div>
-                        <div class="project-stat">
-                            <span class="project-stat-label">Bids</span>
-                            <span class="project-stat-value">${project.bid_count || 0}</span>
-                        </div>
+                        ${(isManager || user.role === 'admin') ? `
+                            <div class="project-stat">
+                                <span class="project-stat-label">Bids</span>
+                                <span class="project-stat-value">${project.bid_count || 0}</span>
+                            </div>
+                        ` : ''}
                     </div>
                     
                     ${project.show_max_bid && project.max_bid ? `
@@ -677,7 +679,7 @@ const ProjectsComponent = {
                     </button>
                     <div class="dropdown-menu">
                         <a class="dropdown-item" onclick="ProjectsComponent.adminReviewBid(${project.id})">
-                            <i class="fas fa-star"></i> Review as Bidder
+                            <i class="fas fa-star"></i> Review a Bidder
                         </a>
                         <a class="dropdown-item" onclick="ProjectsComponent.adminCompleteProject(${project.id})">
                             <i class="fas fa-flag-checkered"></i> Force Complete
@@ -740,6 +742,24 @@ const ProjectsComponent = {
                             <h4>Special Product Care Information</h4>
                             <div class="alert alert-primary">
                                 <i class="fas fa-hand-holding-heart"></i> ${project.product_care_info}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${project.distance_from_truck ? `
+                        <div class="mt-4">
+                            <h4>Distance of push from truck to workspace</h4>
+                            <div class="alert alert-info">
+                                <i class="fas fa-truck"></i> ${project.distance_from_truck}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${project.jobsite_location ? `
+                        <div class="mt-4">
+                            <h4>Location of jobsite</h4>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-map-marker-alt"></i> ${project.jobsite_location}
                             </div>
                         </div>
                     ` : ''}
@@ -1502,7 +1522,7 @@ const ProjectsComponent = {
     },
 
     async adminReviewBid(projectId) {
-        // Allow admin to leave a review as if they were the winning bidder
+        // Allow admin to leave a review as if they were rating the winning bidder
         const rating = prompt('Enter rating (1-5):');
         const review = prompt('Enter review comment:');
         
