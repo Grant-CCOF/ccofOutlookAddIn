@@ -2,11 +2,37 @@
 
 const ProjectModals = {
     // Show create project modal
-    async showCreateModal() {
-        const modal = this.createModal('Create New Project', this.getProjectForm());
+    async showCreateModal(duplicateFrom = null) {
+        let projectData = null;
+        let modalTitle = 'Create New Project';
+        let alertMessage = '';
+        
+        if (duplicateFrom) {
+            // Just add "Copy of" to the title, everything else passes through as-is
+            projectData = {
+                ...duplicateFrom,
+                title: `Copy of ${duplicateFrom.title}`,
+                files: undefined, // Remove Files
+            };
+            modalTitle = 'Duplicate Project';
+            
+            // Add alert message for duplicate mode
+            alertMessage = `
+                <div class="alert alert-info" style="margin-bottom: 20px;">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Note:</strong> Files attached to the original project are not copied. 
+                    You can add new files after creating this duplicate, or edit the project later to attach files.
+                </div>
+            `;
+        }
+
+        // Prepend alert to form content if duplicating
+        const formContent = alertMessage + this.getProjectForm(projectData);
+        
+        const modal = this.createModal(modalTitle, formContent);
         
         // Initialize form and file upload
-        this.initializeProjectForm('createProjectForm');
+        this.initializeProjectForm('createProjectForm', projectData);
         
         // Handle submit
         DOM.on('createProjectForm', 'submit', async (e) => {

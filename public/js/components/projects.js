@@ -649,6 +649,14 @@ const ProjectsComponent = {
                     </button>
                 `);
             }
+
+            actions.push(`
+                <button class="btn btn-outline" 
+                        onclick="ProjectModals.showCreateModal(${JSON.stringify(project).replace(/"/g, '&quot;')})"
+                        title="Duplicate this project">
+                    <i class="fas fa-copy"></i> Duplicate
+                </button>
+            `);
         }
 
         // Delete button
