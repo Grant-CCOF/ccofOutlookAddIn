@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickBooks Authorization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .status {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .status-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        
+        .status-icon.success {
+            color: #10b981;
+        }
+        
+        .status-icon.error {
+            color: #ef4444;
+        }
+        
+        h1 {
+            color: #1f2937;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .code-section {
+            margin: 20px 0;
+        }
+        
+        .label {
+            font-weight: 600;
+            color: #374151;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .code-box {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            word-break: break-all;
+            color: #1f2937;
+            margin-bottom: 12px;
+            position: relative;
+            transition: all 0.2s;
+        }
+        
+        .code-box:hover {
+            border-color: #667eea;
+            background: #ffffff;
+        }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+        
+        .copy-btn.copied {
+            background: #10b981;
+        }
+        
+        .instructions {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            margin-top: 30px;
+            border-radius: 6px;
+        }
+        
+        .instructions h3 {
+            color: #1e40af;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        .instructions ol {
+            color: #1e40af;
+            font-size: 13px;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 4px 0;
+        }
+        
+        .error-message {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 16px;
+            border-radius: 6px;
+            color: #991b1b;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Success State -->
+        <div id="successState" class="hidden">
+            <div class="status">
+                <div class="status-icon success">✓</div>
+                <h1>Authorization Successful!</h1>
+                <p class="subtitle">Copy these values to your Python application</p>
+            </div>
+            
+            <div class="code-section">
+                <label class="label">Authorization Code</label>
+                <div class="code-box" id="codeDisplay"></div>
+                <button class="copy-btn" onclick="copyCode('code')">
+                    <span id="codeBtnText">📋 Copy Authorization Code</span>
+                </button>
+            </div>
+            
+            <div class="code-section">
+                <label class="label">Realm ID (Company ID)</label>
+                <div class="code-box" id="realmDisplay"></div>
+                <button class="copy-btn" onclick="copyCode('realm')">
+                    <span id="realmBtnText">📋 Copy Realm ID</span>
+                </button>
+            </div>
+            
+            <div class="instructions">
+                <h3>📌 Next Steps:</h3>
+                <ol>
+                    <li>Copy both values above (click the buttons)</li>
+                    <li>Return to your Python application</li>
+                    <li>Paste when prompted</li>
+                    <li>You can close this window after copying</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Error State -->
+        <div id="errorState" class="hidden">
+            <div class="status">
+                <div class="status-icon error">✗</div>
+                <h1>Authorization Failed</h1>
+                <p class="subtitle">Something went wrong</p>
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div class="instructions">
+                <h3>🔧 What to do:</h3>
+                <ol>
+                    <li>Return to your Python application</li>
+                    <li>Try the authorization process again</li>
+                    <li>If problem persists, check your QuickBooks app settings</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState">
+            <div class="status">
+                <div class="status-icon">⏳</div>
+                <h1>Processing Authorization...</h1>
+                <p class="subtitle">Please wait</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Parse URL parameters
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                code: params.get('code'),
+                realmId: params.get('realmId'),
+                state: params.get('state'),
+                error: params.get('error'),
+                error_description: params.get('error_description')
+            };
+        }
+        
+        // Copy to clipboard
+        function copyCode(type) {
+            const params = getUrlParams();
+            const text = type === 'code' ? params.code : params.realmId;
+            const btnText = type === 'code' ? 'codeBtnText' : 'realmBtnText';
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById(btnText);
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const btn = document.getElementById(btnText);
+                btn.textContent = '✓ Copied!';
+            });
+        }
+        
+        // Initialize page
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = getUrlParams();
+            const loadingState = document.getElementById('loadingState');
+            const successState = document.getElementById('successState');
+            const errorState = document.getElementById('errorState');
+            
+            // Hide loading
+            loadingState.classList.add('hidden');
+            
+            if (params.error) {
+                // Show error state
+                errorState.classList.remove('hidden');
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = `Error: ${params.error}${params.error_description ? ' - ' + params.error_description : ''}`;
+            } else if (params.code && params.realmId) {
+                // Show success state
+                successState.classList.remove('hidden');
+                document.getElementById('codeDisplay').textContent = params.code;
+                document.getElementById('realmDisplay').textContent = params.realmId;
+            } else {
+                // No params - show error
+                errorState.classList.remove('hidden');
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = 'No authorization data received. Please try the authorization process again.';
+            }
+        });
+    </script>
+</body>
+</html>
