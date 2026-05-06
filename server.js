@@ -49,11 +49,13 @@ const notificationRoutes = require('./routes/notifications');
 const fileRoutes = require('./routes/files');
 const ratingRoutes = require('./routes/ratings');
 const adminRoutes = require('./routes/admin');
+const dealRoutes = require('./routes/deals');
 
 // Import services
 const logger = require('./utils/logger');
 const fileService = require('./services/fileService');
 const emailService = require('./services/microsoftEmailService');
+const hubspotService = require('./services/hubspotService');
 
 async function sendStartupNotification() {
     try {
@@ -93,7 +95,17 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration
+// CORS DEALS configuration
+app.use('/api/deals/by-invoice', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Accept, Authorization');
+    res.setHeader('Vary', 'Origin');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+});
+
+// Global CORS Configuration
 app.use(cors({
     origin: process.env.CORS_ORIGIN || "*",
     credentials: true,
@@ -254,6 +266,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/deals', dealRoutes);
 
 // Catch all route - serve index.html for client-side routing
 app.get('*', (req, res) => {

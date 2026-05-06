@@ -745,7 +745,7 @@ class MicrosoftEmailService {
                 
                 const isWinner = bid.id === winningBid.id;
                 const subject = isWinner ? 
-                    `🎉 Congratulations! You Won: ${project.title}` : 
+                    `Congratulations! You Won: ${project.title}` : 
                     `Bid Update: ${project.title}`;
                 
                 const html = isWinner ? 
@@ -812,7 +812,7 @@ class MicrosoftEmailService {
                 try {
                     const isWinner = bidder.is_winner === 1;
                     const subject = isWinner ? 
-                        `✅ Project Completed: ${project.title}` : 
+                        `Project Completed: ${project.title}` : 
                         `Project Update: ${project.title} - Completed`;
                     
                     const html = isWinner ? 
@@ -932,7 +932,7 @@ class MicrosoftEmailService {
                         <p>Your project has been marked as complete</p>
                     </div>
                     <div class="content">
-                        <div class="checkmark">✓</div>
+                        <div class="checkmark"></div>
                         
                         <h2>Hello ${pm.name || 'Project Manager'},</h2>
                         
@@ -1029,10 +1029,10 @@ class MicrosoftEmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🎊 Project Completed! 🎊</h1>
+                        <h1>Project Completed!</h1>
                     </div>
                     <div class="content">
-                        <div class="celebration">🏆</div>
+                        <div class="celebration"></div>
                         
                         <h2>Congratulations ${winner.company || winner.name}!</h2>
                         
@@ -1177,11 +1177,11 @@ class MicrosoftEmailService {
             <body>
                 <div class="container">
                     <div class="header winner-header">
-                        <h1>🎉 Congratulations!</h1>
+                        <h1>Congratulations!</h1>
                         <p>Your bid has been selected</p>
                     </div>
                     <div class="content">
-                        <div class="trophy">🏆</div>
+                        <div class="trophy"></div>
                         
                         <h2>${project.title}</h2>
                         
